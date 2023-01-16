@@ -11,6 +11,9 @@
 
 #include "Object.h"
 
+#include "FBO.h"
+#include "QuadMesh.h"
+
 struct Light {
     glm::vec3 color;
     glm::vec3 position;
@@ -21,7 +24,8 @@ class Renderer
 public:
 	Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT);
 
-	void Draw(std::vector<Object*>& objects);
+	void Draw(std::vector<Object*>& objects, 
+        int SCREEN_WIDTH, int SCREEN_HEIGHT);
     
     void Deserialize(std::string path);
     nlohmann::json::value_type Serialize();
@@ -49,9 +53,10 @@ public:
     std::vector<Light> m_Lights;
 
     // Shaders: 
-    // One for coloring and lighting for the model
-    // Second one for drawing skeleton and grid lines
-    Shader* m_ModelShader, * m_ModelShaderPBR, * m_LineShader;
+    Shader* m_ModelShader, * m_ModelShaderPBR,
+        *m_DefShaderGBuffer, *m_DefShaderLighting,
+        *m_DefShaderGBufTex, * m_DefShaderLightingTex,
+        *m_LineShader;
 
     // A ref to the scene camera
     Camera* m_Camera;
@@ -61,7 +66,12 @@ public:
     glm::mat4 m_RotMat;
 
     // Mesh for sphere
-    SphereMesh* m_SphereMesh;
+    SphereMesh m_SphereMesh;
+
+    // G Buffer for Def. Shading
+    FBO FBOForDefShading;
+
+    QuadMesh m_QuadDefShadingOutput;
 
     unsigned int m_CubeMapTexID;
     unsigned int m_SkyBoxVAO;
@@ -73,8 +83,7 @@ public:
     bool m_DrawMassPoints = true;
 
 private:
-    void SetModelShaderVars();
+    void SetLightingVars(Shader* shader);
     void SetupLineShaderVars();
     //void DrawGrid();
-
 };

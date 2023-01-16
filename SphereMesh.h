@@ -95,7 +95,7 @@ public:
             tangents.push_back(tangent);
             bitangents.push_back(bitangent);
 
-            int size = tangents.size();
+            int size = static_cast<int>(tangents.size());
             int found = FindSimilarVertex(positions, uv, normals, i, size);
 
             if (found != -1) {

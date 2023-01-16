@@ -26,8 +26,8 @@ public:
 	}
 
 	void DeleteAllObjects() {
-		for (auto obj : m_ObjectList) {
-			delete obj;
+		for (auto it = m_ObjectList.begin(); it != m_ObjectList.end(); it++) {
+			delete *it;
 		}
 		m_ObjectList.clear();
 	}

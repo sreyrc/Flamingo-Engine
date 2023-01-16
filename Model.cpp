@@ -20,7 +20,11 @@ void Model::LoadModel(std::string const& path)
         return;
     }
 
-    // process ASSIMP's root node recursively
+    // path = "../res/abc/abc.extension"
+    // need: "../res/abc/"
+    m_Directory = path.substr(0, path.find_last_of('/'));
+
+    // Process ASSIMP's root node recursively
     m_Root = ProcessNode(scene->mRootNode, scene);
 }
 
@@ -51,6 +55,7 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
     // Data to fill
     std::vector<Vertex> vertices;
     std::vector<unsigned int> indices;
+    std::vector<Texture*> textures;
 
     // Go through each of the mesh's vertices
     for (unsigned int i = 0; i < mesh->mNumVertices; i++)
@@ -73,6 +78,27 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
             vertex.Normal = vector;
         }
 
+        // Texture coordinates
+        if (mesh->mTextureCoords[0]) // does the mesh contain texture coordinates?
+        {
+            glm::vec2 vec;
+            vec.x = mesh->mTextureCoords[0][i].x;
+            vec.y = mesh->mTextureCoords[0][i].y;
+            vertex.TexCoords = vec;
+            
+            // Tangent
+            vector.x = mesh->mTangents[i].x;
+            vector.y = mesh->mTangents[i].y;
+            vector.z = mesh->mTangents[i].z;
+            vertex.Tangent = vector;
+
+            // Bitangent
+            vector.x = mesh->mBitangents[i].x;
+            vector.y = mesh->mBitangents[i].y;
+            vector.z = mesh->mBitangents[i].z;
+            vertex.Bitangent = vector;
+        }
+
         vertices.push_back(vertex);
         m_AllVertices.push_back(vertex);
     }
@@ -87,5 +113,55 @@ Mesh Model::ProcessMesh(aiMesh* mesh, const aiScene* scene)
             indices.push_back(face.mIndices[j]);
     }
 
-    return Mesh(vertices, indices);
+    // process materials
+    aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+
+
+   // aiString fileBaseColor, fileMetallic, fileRoughness;
+    if (material) {
+        Texture* diffuseMap = LoadMaterialTexture("Diffuse");
+        if (diffuseMap) textures.push_back(diffuseMap);
+
+        Texture* normalMap = LoadMaterialTexture("Normal");
+        if (normalMap) textures.push_back(normalMap);
+
+        Texture* roughnessMap = LoadMaterialTexture("Roughness");
+        if (roughnessMap) textures.push_back(roughnessMap);
+
+        Texture* metalnessMap = LoadMaterialTexture("Metalness");
+        if (metalnessMap) textures.push_back(metalnessMap);
+    }
+
+    
+    //// 1. Diffuse maps
+    //std::vector<Texture*> diffuseMaps = LoadMaterialTextures("Diffuse");
+    //textures.insert(textures.end(), diffuseMaps.begin(), diffuseMaps.end());
+    //
+    //// 3. Normal maps
+    //std::vector<Texture*> normalMaps = LoadMaterialTextures("Normal");
+    //textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+  
+    //// 2. Roughness and Metalnesss maps
+    //std::vector<Texture*> roughnessMaps = LoadMaterialTextures("Roughness");
+    //textures.insert(textures.end(), roughnessMaps.begin(), roughnessMaps.end());
+
+    return Mesh(vertices, indices, textures);
 }
+
+
+// checks all material textures of a given type and loads the textures if they're not loaded yet.
+// the required info is returned as a Texture struct.
+Texture* Model::LoadMaterialTexture(std::string typeName)
+{
+    std::string texPath = m_Directory + "/textures/" + typeName + ".png";
+    Texture* texture = new Texture(texPath, typeName);
+    if (!texture->isLoaded()) {
+        delete texture; return nullptr;
+    }
+    // If texture at this path is not found - add this tex
+    if (m_TexturesLoaded.find(texPath) == m_TexturesLoaded.end()) {
+        m_TexturesLoaded[texPath] = texture;
+    }
+    return m_TexturesLoaded.at(texPath);
+};
+

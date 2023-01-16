@@ -1,7 +1,7 @@
 ﻿/*
 **********************************************************
 Framework by Sreyash(Srey) Raychaudhuri
-Collision Detection / Fried Engine
+Collision Detection / Echidna Engine
 **********************************************************
 * */
 
@@ -44,7 +44,6 @@ const int SCREEN_HEIGHT = 1080;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
-
 void PrintVec3(glm::vec3 vec3) {
     std::cout << vec3.x << ", " << vec3.y << ", " << vec3.z << '\n';
 }
@@ -59,9 +58,9 @@ int main() {
     // glfw: initialize and configure
     // ------------------------------
     glfwInit();
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -69,7 +68,7 @@ int main() {
 
     // glfw window creation
     // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Fried Engine", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Flamingo Engine", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -118,7 +117,7 @@ int main() {
     SceneManager* p_SceneManager = new SceneManager(p_ObjectManager,
         p_ObjectFactory, p_ResourceManager, p_CollisionWorld, p_Renderer);
 
-    lastFrame = glfwGetTime();
+    lastFrame = static_cast<float>(glfwGetTime());
 
     // Update loop
     // -----------
@@ -137,13 +136,14 @@ int main() {
         p_CollisionWorld->Update();
 
         // Draw call
-        p_Renderer->Draw(p_ObjectManager->m_ObjectList);
-
-        // If changes made with Imgui interface, update
-        p_Editor->Update(p_ObjectManager, p_ObjectFactory,
-            p_SceneManager, p_ResourceManager, p_CollisionWorld, p_Renderer);
+        p_Renderer->Draw(p_ObjectManager->m_ObjectList, 
+            SCREEN_WIDTH, SCREEN_HEIGHT);
 
         p_CollisionWorld->ClearCollisionQueues();
+
+        // If changes made with Imgui interface, update
+        p_Editor->Update(p_Camera, p_ObjectManager, p_ObjectFactory,
+            p_SceneManager, p_ResourceManager, p_CollisionWorld, p_Renderer);
 
         // Delete necessary objects
         p_ObjectManager->DestroyDeletedObjects();

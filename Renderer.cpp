@@ -18,11 +18,30 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_LineWidth = 1.0f;
     m_LineColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
-    // Loading shaders: one for the model and the other for line drawing
+    // Creating shaders
     m_ModelShader = new Shader("ModelShader.vert", "ModelShader.frag");
     m_ModelShaderPBR = new Shader("ModelShaderPBR.vert", "ModelShaderPBR.frag");
+    m_DefShaderGBuffer = new Shader("DefShaderGBufPass.vert", "DefShaderGBufPass.frag");
+    m_DefShaderLighting = new Shader("DefShaderLightingPass.vert", "DefShaderLightingPass.frag");
+    m_DefShaderGBufTex = new Shader("DefShaderGBufTex.vert", "DefShaderGBufTex.frag");
     m_LineShader = new Shader("LineShader.vert", "LineShader.frag"); 
     //m_SkyBoxShader = new Shader("Skybox.vert", "Skybox.frag");
+
+    // Set samplers for textures which will be used to fill in G-Buffer
+    m_DefShaderGBufTex->Use();
+    m_DefShaderGBufTex->SetInt("normalMap", 0);
+    m_DefShaderGBufTex->SetInt("diffuseMap", 1);
+    m_DefShaderGBufTex->SetInt("roughnessMap", 2);
+    m_DefShaderGBufTex->SetInt("metallicMap", 3);
+    m_DefShaderGBufTex->Unuse();
+
+    // Set samplers
+    m_DefShaderLighting->Use();
+    m_DefShaderLighting->SetInt("gPosition", 0);
+    m_DefShaderLighting->SetInt("gNormal", 1);
+    m_DefShaderLighting->SetInt("gDiffuse", 2);
+    m_DefShaderLighting->SetInt("gRoughMetal", 3);
+    m_DefShaderLighting->Unuse();
 
     //m_SkyBoxShader->Use();
     //m_SkyBoxShader->SetInt("skybox", 0);
@@ -38,85 +57,89 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 
     m_RotMat = glm::mat4(1.0f);
 
-    m_SphereMesh = new SphereMesh();
+    //m_SphereMesh = new SphereMesh();
 
     m_ProjMat = glm::perspective(glm::radians(m_Camera->m_Zoom),
         (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
 
     m_SkyBoxVAO = 0; m_SkyBoxVBO = 0;
 
-    float skyboxVertices[] = {
-        // positions          
-        -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
+    // Create an FBO with 4 color attachments/buffers
+    FBOForDefShading.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 4);
 
-        -1.0f, -1.0f,  1.0f,
-        -1.0f, -1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f, -1.0f,
-        -1.0f,  1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f,
+    //float skyboxVertices[] = {
+    //    // positions          
+    //    -1.0f,  1.0f, -1.0f,
+    //    -1.0f, -1.0f, -1.0f,
+    //     1.0f, -1.0f, -1.0f,
+    //     1.0f, -1.0f, -1.0f,
+    //     1.0f,  1.0f, -1.0f,
+    //    -1.0f,  1.0f, -1.0f,
 
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
+    //    -1.0f, -1.0f,  1.0f,
+    //    -1.0f, -1.0f, -1.0f,
+    //    -1.0f,  1.0f, -1.0f,
+    //    -1.0f,  1.0f, -1.0f,
+    //    -1.0f,  1.0f,  1.0f,
+    //    -1.0f, -1.0f,  1.0f,
 
-        -1.0f, -1.0f,  1.0f,
-        -1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f, -1.0f,  1.0f,
-        -1.0f, -1.0f,  1.0f,
+    //     1.0f, -1.0f, -1.0f,
+    //     1.0f, -1.0f,  1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //     1.0f,  1.0f, -1.0f,
+    //     1.0f, -1.0f, -1.0f,
 
-        -1.0f,  1.0f, -1.0f,
-         1.0f,  1.0f, -1.0f,
-         1.0f,  1.0f,  1.0f,
-         1.0f,  1.0f,  1.0f,
-        -1.0f,  1.0f,  1.0f,
-        -1.0f,  1.0f, -1.0f,
+    //    -1.0f, -1.0f,  1.0f,
+    //    -1.0f,  1.0f,  1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //     1.0f, -1.0f,  1.0f,
+    //    -1.0f, -1.0f,  1.0f,
 
-        -1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f, -1.0f,
-         1.0f, -1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f,
-         1.0f, -1.0f,  1.0f
-    };
-    // first, configure the cube's VAO (and VBO)
-    glGenVertexArrays(1, &m_SkyBoxVAO);
-    glGenBuffers(1, &m_SkyBoxVBO);
+    //    -1.0f,  1.0f, -1.0f,
+    //     1.0f,  1.0f, -1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //     1.0f,  1.0f,  1.0f,
+    //    -1.0f,  1.0f,  1.0f,
+    //    -1.0f,  1.0f, -1.0f,
 
-    glBindBuffer(GL_ARRAY_BUFFER, m_SkyBoxVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
+    //    -1.0f, -1.0f, -1.0f,
+    //    -1.0f, -1.0f,  1.0f,
+    //     1.0f, -1.0f, -1.0f,
+    //     1.0f, -1.0f, -1.0f,
+    //    -1.0f, -1.0f,  1.0f,
+    //     1.0f, -1.0f,  1.0f
+    //};
+    //// first, configure the cube's VAO (and VBO)
+    //glGenVertexArrays(1, &m_SkyBoxVAO);
+    //glGenBuffers(1, &m_SkyBoxVBO);
 
-    glBindVertexArray(m_SkyBoxVAO);
+    //glBindBuffer(GL_ARRAY_BUFFER, m_SkyBoxVBO);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
 
-    // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
+    //glBindVertexArray(m_SkyBoxVAO);
 
-    std::vector<std::string> faces
-    {
-        "../skybox/right.jpg",
-        "../skybox/left.jpg",
-        "../skybox/top.jpg",
-        "../skybox/bottom.jpg",
-        "../skybox/front.jpg",
-        "../skybox/back.jpg"
-    };
-    m_CubeMapTexID = LoadCubemap(faces);
+    //// position attribute
+    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+    //glEnableVertexAttribArray(0);
+
+    //std::vector<std::string> faces
+    //{
+    //    "../skybox/right.jpg",
+    //    "../skybox/left.jpg",
+    //    "../skybox/top.jpg",
+    //    "../skybox/bottom.jpg",
+    //    "../skybox/front.jpg",
+    //    "../skybox/back.jpg"
+    //};
+    //m_CubeMapTexID = LoadCubemap(faces);
 }
 
 
 // Draw skeleton and model if opted for
-void Renderer::Draw(std::vector<Object*>& objects)
+void Renderer::Draw(std::vector<Object*>& objects, 
+    int SCREEN_WIDTH, int SCREEN_HEIGHT)
 {
     glEnable(GL_DEPTH_TEST);
  
@@ -148,39 +171,115 @@ void Renderer::Draw(std::vector<Object*>& objects)
     //glDrawElements(GL_TRIANGLE_STRIP,
     //    m_SphereMesh->GetIndexCount(), GL_UNSIGNED_INT, 0);
 
-    // Draw the models
-    m_ModelShaderPBR->Use();
-    m_ModelShaderPBR->SetMat4("proj", m_ProjMat);
-    m_ModelShaderPBR->SetMat4("view", m_ViewMat);
 
-    SetModelShaderVars();
+    // ---- DEFERRED SHADING ---
+    //  
+    // PASS 1 - G-BUFFER PASS
 
-    // Draw the models/meshes
+    // Bind this FBO first. So that all output is to this 
+    FBOForDefShading.Bind();
+
+    glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+
+    // Load data of all objects into the G-Buffers
     for (auto obj : objects) {
-        m_ModelShaderPBR->SetMat4("model", 
-            obj->GetComponent<Transform*>()->GetWorldTransform());
 
-        // Set material properties
-        auto material = obj->GetComponent<Material*>();
-        if (material) {
-            m_ModelShaderPBR->SetVec3("material.albedo", material->m_Albedo);
-            m_ModelShaderPBR->SetFloat("material.metallic", material->m_Metallic);
-            m_ModelShaderPBR->SetFloat("material.roughness", material->m_Roughness);
-            m_ModelShaderPBR->SetFloat("material.ao", material->m_AO);
+        ModelComp* modelComp = obj->GetComponent<ModelComp*>();
+
+        // If we are to use the textures
+        if (modelComp->GetModel()->m_UseTextures) {
+
+            // Use the shader that takes in textures
+            m_DefShaderGBufTex->Use();
+            m_DefShaderGBufTex->SetMat4("proj", m_ProjMat);
+            m_DefShaderGBufTex->SetMat4("view", m_ViewMat);
+            m_DefShaderGBufTex->SetMat4("model",
+                obj->GetComponent<Transform*>()->GetWorldTransform());
+
+            // Draw the model with this shader. Txtures are bound within the draw call
+            obj->GetComponent<ModelComp*>()->Draw(*m_DefShaderGBufTex);
         }
+        else {
+            // Use material component parameters
+            m_DefShaderGBuffer->Use();
+            m_DefShaderGBuffer->SetMat4("proj", m_ProjMat);
+            m_DefShaderGBuffer->SetMat4("view", m_ViewMat);
+            m_DefShaderGBuffer->SetMat4("model",
+                obj->GetComponent<Transform*>()->GetWorldTransform());
 
-        // Draw call
-        obj->GetComponent<ModelComp*>()->Draw(*m_ModelShaderPBR);
+            // Set material properties
+            auto material = obj->GetComponent<Material*>();
+            if (material) {
+                m_DefShaderGBuffer->SetVec3("material.kD", material->m_Albedo);
+                m_DefShaderGBuffer->SetFloat("material.metalness", material->m_Metalness);
+                m_DefShaderGBuffer->SetFloat("material.alpha", material->m_Roughness);
+            }
+            // Draw the model with this shader
+            obj->GetComponent<ModelComp*>()->Draw(*m_DefShaderGBuffer);
+        }
     }
+
+    // PASS 2 - LIGHTING PASS
+
+    // Now output is to the screen
+    FBOForDefShading.Unbind();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    m_DefShaderLighting->Use();
+
+     // Bind all G-Buffer textures
+     // TODO: Replace with i < numColorAttachments or sth
+    for (int i = 0; i < 4; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, FBOForDefShading.m_GBuffers[i]);
+    }
+
+    SetLightingVars(m_DefShaderLighting);
+
+    m_DefShaderLighting->SetVec3("camPos", m_ViewPos);
+
+    m_QuadDefShadingOutput.BindVAO();
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+
+    glDisable(GL_DEPTH_TEST);
+
+    // ------- FORWARD SHADING -------
+    //// Draw the models
+    //m_ModelShaderPBR->Use();
+    //m_ModelShaderPBR->SetMat4("proj", m_ProjMat);
+    //m_ModelShaderPBR->SetMat4("view", m_ViewMat);
+
+    //SetModelShaderVars();
+
+    //// Draw the models/meshes
+    //for (auto obj : objects) {
+    //    m_ModelShaderPBR->SetMat4("model", 
+    //        obj->GetComponent<Transform*>()->GetWorldTransform());
+
+    //    // Set material properties
+    //    auto material = obj->GetComponent<Material*>();
+    //    if (material) {
+    //        m_ModelShaderPBR->SetVec3("material.albedo", material->m_Albedo);
+    //        m_ModelShaderPBR->SetFloat("material.metallic", material->m_Metallic);
+    //        m_ModelShaderPBR->SetFloat("material.roughness", material->m_Roughness);
+    //        m_ModelShaderPBR->SetFloat("material.ao", material->m_AO);
+    //    }
+
+    //    // Draw call
+    //    obj->GetComponent<ModelComp*>()->Draw(*m_ModelShaderPBR);
+    //}
 
     SetupLineShaderVars();
 
     // Draw the Bounding Volumes of Colliders
     for (auto obj : objects) {
         auto col = obj->GetComponent<Collider*>();
-        if (col->inCollision() ) m_LineShader->SetVec3("lineColor", glm::vec3(1.0f, 0.0f, 0.0f));
-        else m_LineShader->SetVec3("lineColor", glm::vec3(1.0f, 1.0f, 1.0f));
-        col->Draw();
+        col->Draw(m_LineShader);
     }
 }
 
@@ -234,22 +333,17 @@ nlohmann::json::value_type Renderer::Serialize()
 }
 
 // Set variables in the shader for the model
-void Renderer::SetModelShaderVars() {
+void Renderer::SetLightingVars(Shader* shader) {
 
     for (int i = 0; i < m_Lights.size(); i++) {
         // Set light position and color (for now, just one light source)
-        m_ModelShaderPBR->SetVec3("lights[" + std::to_string(i) + "].position", m_Lights[i].position);
-        m_ModelShaderPBR->SetVec3("lights[" + std::to_string(i) + "].color", m_Lights[i].color);
+        shader->SetVec3("lights[" + std::to_string(i) + "].position", m_Lights[i].position);
+        shader->SetVec3("lights[" + std::to_string(i) + "].color", m_Lights[i].color);
     }
 
-    // TODO: Uncommment soon
-    //// Set light position and color (for now, just one light source)
-    //m_ModelShaderPBR->SetVec3("lights[0].position", m_LightPos);
-    //m_ModelShaderPBR->SetVec3("lights[0].color", m_LightColor);
-
     // Set other vars
-    m_ModelShaderPBR->SetInt("numberOfLights", m_Lights.size());
-    m_ModelShaderPBR->SetVec3("camPos", m_ViewPos);
+    shader->SetInt("numberOfLights", static_cast<GLint>(m_Lights.size()));
+    shader->SetVec3("camPos", m_ViewPos);
 }
 
 
@@ -261,23 +355,6 @@ void Renderer::SetupLineShaderVars() {
     m_LineShader->SetMat4("model", glm::mat4(1.0f));
     m_LineShader->SetMat4("proj", m_ProjMat);
 }
-
-//// Draw the grid lines
-//void Renderer::DrawGrid() {
-//
-//    glEnable(GL_DEPTH_TEST);
-//    glBegin(GL_LINES);
-//
-//    for (int i = -5; i <= 5; i++) {
-//        glVertex3f(i, 0, -5);
-//        glVertex3f(i, 0, 5);
-//        glVertex3f(-5, 0, i);
-//        glVertex3f(5, 0, i);
-//    };
-//    glEnd();
-//
-//    glDisable(GL_LINE_SMOOTH);
-//}
 
 unsigned int LoadCubemap(std::vector<std::string> faces)
 {

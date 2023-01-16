@@ -93,6 +93,9 @@
     <ClCompile Include="CollisionWorld.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="OBB.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shader.h">
@@ -191,6 +194,18 @@
     <ClInclude Include="SceneManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="OBB.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FBO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="QuadMesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="ModelShader.frag">
@@ -221,6 +236,24 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="ModelShaderPBR.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderGBufPass.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderGBufPass.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderLightingPass.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderLightingPass.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderGBufTex.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefShaderGBufTex.frag">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

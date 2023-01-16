@@ -9,13 +9,15 @@
 #include <vector>
 
 #include "Shader.h"
-
-#define MAX_BONE_INFLUENCE 4
+#include "Texture.h"
 
 // Vertex attributes
 struct Vertex {
     glm::vec3 Position;
     glm::vec3 Normal;
+    glm::vec2 TexCoords;
+    glm::vec3 Tangent;
+    glm::vec3 Bitangent;
 };
 
 class Mesh {
@@ -23,12 +25,18 @@ public:
     // Mesh Data
     std::vector<Vertex>       vertices;
     std::vector<unsigned int> indices;
+    std::vector<Texture*>     textures;
+
     unsigned int VAO;
 
-    Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices);
+    Mesh(std::vector<Vertex> vertices, 
+        std::vector<unsigned int> indices, 
+        std::vector<Texture*> textures);
 
     //Render the mesh
     void Draw(Shader& shader);
+
+    void BindTextures(Shader& shader);
 
 private:
     // Render data 

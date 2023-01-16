@@ -4,15 +4,17 @@
 #include "BoundingVolume.h"
 #include "ResourceManager.h"
 #include "AABB.h"
+#include "OBB.h"
 
 #include <nlohmann/json.hpp>
 
 class Object;
+class Shader;
 
 // Component Base class
 class Component {
 public:
-	//virtual ~Component() = 0;
+	virtual ~Component() {};
 	virtual void Update() = 0;
 	virtual std::string GetName() = 0;
 	virtual void Initialize() = 0;
@@ -26,7 +28,7 @@ public:
 	Object* GetParent() { return m_Parent; }
 
 protected:
-	Object* m_Parent;
+	Object* m_Parent = nullptr;
 };
 
 // Transform component
@@ -38,7 +40,7 @@ public:
 		m_Scale(0),
 		m_WorldTransform(1.0f) {};
 
-	//virtual ~Transform() {};
+	virtual ~Transform() {};
 
 	virtual std::string GetName() { return "Transform"; }
 
@@ -107,7 +109,10 @@ class Collider : public Component {
 public:
 	Collider() : m_BVLevel1(nullptr), m_BVLevel2(nullptr) {}
 
-	//virtual ~Collider() {}
+	virtual ~Collider() {
+		delete m_BVLevel1;
+		delete m_BVLevel2;
+	}
 
 	virtual void Initialize() {
 		m_BVLevel1->Initialize();
@@ -116,22 +121,23 @@ public:
 
 	virtual std::string GetName() { return "Collider"; }
 
-	void Draw() {
-		m_BVLevel1->Draw();
-
-		//  TODO: Activate this when ready
-		//m_BVLevel2->UpdateVBDataAndDraw();
+	void Draw(Shader* shader) {
+		m_BVLevel1->Draw(shader);
+		m_BVLevel2->Draw(shader);
 	}
+
+	// hashmap[str comp_name] = CollCreator->create();
 
 	void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager) {
 
-		if (jsonObj["BV_Level_1"] == "AABB") {
-			m_BVLevel1 = new AABB();
-		}
-		if (jsonObj["BV_Level_2"] == "AABB") {
-			m_BVLevel2 = new AABB();
-		}
+		// TODO: This yucky "if" - approach isn't scalable. 
+		// Replace with an alternative eventually
+		if (jsonObj["BV_Level_1"] == "AABB") { m_BVLevel1 = new AABB(); }
+		if (jsonObj["BV_Level_1"] == "OBB") { m_BVLevel1 = new OBB(); }
+
+		if (jsonObj["BV_Level_2"] == "AABB") { m_BVLevel2 = new AABB(); }
+		if (jsonObj["BV_Level_2"] == "OBB") { m_BVLevel2 = new OBB(); }
 
 		m_BVLevel1->SetParentCollider(this);
 		m_BVLevel2->SetParentCollider(this);
@@ -143,8 +149,12 @@ public:
 
 		if (m_BVLevel1Type == BVType::AABB)
 			jsonObject["BV_Level_1"] = "AABB";
+		if (m_BVLevel1Type == BVType::OBB)
+			jsonObject["BV_Level_1"] = "OBB";
 		if (m_BVLevel2Type == BVType::AABB)
 			jsonObject["BV_Level_2"] = "AABB";
+		if (m_BVLevel2Type == BVType::OBB)
+			jsonObject["BV_Level_2"] = "OBB";
 
 		return jsonObject;
 	}
@@ -153,11 +163,14 @@ public:
 		m_BVLevel1->Update();
 
 		// TODO: Activate this when ready
-		//m_BVLevel2->Update();
+		m_BVLevel2->Update();
 	};
 
-	inline void IsInCollision(bool inCol) { m_inCollision = inCol; }
-	inline bool inCollision() { return m_inCollision; }
+	inline void IsInCollision(bool inCol) {
+		m_BVLevel1->IsInCollision(inCol);
+		m_BVLevel2->IsInCollision(inCol);
+	}
+	//inline bool inCollision() { return m_inCollision; }
 
 	BoundingVolume* m_BVLevel1, * m_BVLevel2;
 
@@ -173,7 +186,7 @@ class ModelComp : public Component {
 public:
 	ModelComp() : m_Model(nullptr) {};
 	ModelComp(Model* model) : m_Model(model) {}
-	//virtual ~ModelComp() {}
+	virtual ~ModelComp() {}
 	virtual void Update() {}
 	virtual void Initialize() {}
 
@@ -213,8 +226,8 @@ private:
 
 class Material : public Component {
 public:
-	Material() : m_Albedo(0), m_Metallic(0), m_Roughness(0), m_AO(0) {}
-	//virtual ~Material() {}
+	Material() : m_Albedo(0), m_Metalness(0), m_Roughness(0), m_AO(0) {}
+	virtual ~Material() {}
 	virtual void Update() {}
 	virtual std::string GetName() { return "Material"; }
 	virtual void Initialize() {}
@@ -225,7 +238,7 @@ public:
 		m_Albedo = glm::vec3(jsonObj["Albedo"][0],
 			jsonObj["Albedo"][1], jsonObj["Albedo"][2]);
 
-		m_Metallic = jsonObj["Metalness"];
+		m_Metalness = jsonObj["Metalness"];
 		m_Roughness = jsonObj["Roughness"];
 		m_AO = jsonObj["AO"];
 	};
@@ -236,13 +249,13 @@ public:
 		nlohmann::json jsonObject;
 		jsonObject["Albedo"] = nlohmann::json::array(
 			{m_Albedo.x, m_Albedo.y, m_Albedo.z});
-		jsonObject["Metalness"] = m_Metallic;
+		jsonObject["Metalness"] = m_Metalness;
 		jsonObject["Roughness"] = m_Roughness;
 		jsonObject["AO"] = m_AO;
 		return jsonObject;
 	}
 
 	glm::vec3 m_Albedo;
-	float m_Metallic, m_Roughness, m_AO;
+	float m_Metalness, m_Roughness, m_AO;
 };
 

@@ -99,6 +99,11 @@ void Shader::Use()
     glUseProgram(mID);
 }
 
+void Shader::Unuse()
+{
+    glUseProgram(0);
+}
+
 void Shader::SetVec3(const std::string& name, GLfloat v0, GLfloat v1, GLfloat v2)
 {
     glUniform3f(glGetUniformLocation(mID, name.c_str()), v0, v1, v2);

@@ -7,8 +7,8 @@
 class Object
 {
 public:
-	Object() : m_Name("") {};
-	Object(std::string name) : m_Name(name) {}
+	Object() : m_Name(""), m_IsDeleted(false) {};
+	Object(std::string name) : m_Name(name), m_IsDeleted(false) {}
 
 	void AddComponent(Component* comp) {
 		comp->SetParent(this);
@@ -54,14 +54,17 @@ public:
 	}
 
 	~Object() {
-		for (auto comp : m_Components) {
-			delete comp;
+		for (auto it = m_Components.begin(); it != m_Components.end(); it++) {
+			delete *it;
 		}
 		m_Components.clear();
 	}
 
+	inline void SetName(std::string name) { m_Name = name; }
+
+	char m_ObjectNameBuff[255];
 private:
-	std::string m_Name = ""; bool m_IsDeleted = false;
+	std::string m_Name = ""; bool m_IsDeleted;
 	std::vector<Component*> m_Components;
 };
 

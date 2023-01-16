@@ -63,12 +63,13 @@ public:
 		p_Renderer->Deserialize("../scenes/" + sceneName + ".json");
 	}
 
-	void SaveScene(ObjectManager* p_GameObjectManager, Renderer* p_Renderer) {
+	void SaveScene(std::string newSceneName,
+		ObjectManager* p_GameObjectManager, Renderer* p_Renderer) {
 		// Save the json
 		nlohmann::json sceneData;
 		sceneData["Objects"] = p_GameObjectManager->Serialize();
 		sceneData["Lights"] = p_Renderer->Serialize();
-		std::string newSceneName = "Scene" + std::to_string(++m_SceneNum);
+		//std::string newSceneName = "Scene" + std::to_string(++m_SceneNum);
 		std::ofstream savedScene("../scenes/" + newSceneName + ".json");
 		savedScene << std::setw(4) << sceneData;
 
@@ -86,7 +87,9 @@ public:
 		ReadSceneList();
 	}
 
-	unsigned int m_SceneNum = 0;
+	//unsigned int m_SceneNum = 0;
+	char m_SceneNameBuf[255];
+	std::string m_SceneName = "";
 
 	std::string m_SelectedScene;
 

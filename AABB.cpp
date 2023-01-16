@@ -15,6 +15,39 @@ void FillAABBVertexValues(std::vector<glm::vec3>& vertices, glm::vec3 min, glm::
 	vertices[7] = max;
 }
 
+AABB::AABB()
+	: m_Min(0), m_Max(0) {
+
+	m_Type = BVType::AABB;
+
+	glGenVertexArrays(1, &m_VAO);
+	glGenBuffers(1, &m_VBO);
+	glGenBuffers(1, &m_IBO);
+
+	m_Indices.resize(24);
+
+	m_Indices[0] = 0;  m_Indices[1] = 1;
+	m_Indices[2] = 0;  m_Indices[3] = 2;
+	m_Indices[4] = 0;  m_Indices[5] = 3;
+	m_Indices[6] = 5;  m_Indices[7] = 1;
+	m_Indices[8] = 5;  m_Indices[9] = 3;
+	m_Indices[10] = 5; m_Indices[11] = 7;
+	m_Indices[12] = 6; m_Indices[13] = 2;
+	m_Indices[14] = 6; m_Indices[15] = 3;
+	m_Indices[16] = 6; m_Indices[17] = 7;
+	m_Indices[18] = 4; m_Indices[19] = 2;
+	m_Indices[20] = 4; m_Indices[21] = 1;
+	m_Indices[22] = 4; m_Indices[23] = 7;
+
+	glBindVertexArray(m_VAO);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_IBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+		m_Indices.size() * sizeof(unsigned int), &m_Indices[0], GL_STATIC_DRAW);
+
+	glBindVertexArray(0);
+}
+
 void AABB::Initialize()
 {
 	m_Vertices.clear();
@@ -69,47 +102,25 @@ void AABB::Update()
 	}
 
 	FillAABBVertexValues(m_Vertices, m_Min, m_Max);
+
+	// Fill in the new data for drawing
+	glBindVertexArray(m_VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+	glBufferData(GL_ARRAY_BUFFER, m_Vertices.size() * sizeof(glm::vec3),
+		&m_Vertices[0], GL_STREAM_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
 }
 
-void AABB::Draw()
+void AABB::Draw(Shader* shader)
 {
+	if (m_InCollision) { shader->SetVec3("lineColor", glm::vec3(1.0f, 0.0f, 0.0f)); }
+	else shader->SetVec3("lineColor", glm::vec3(1.0f, 1.0f, 1.0f));
+
 	glLineWidth(1.5f);
-
-	glBegin(GL_LINES);
-		glVertex3f(m_Vertices[0].x, m_Vertices[0].y, m_Vertices[0].z);
-		glVertex3f(m_Vertices[1].x, m_Vertices[1].y, m_Vertices[1].z);
-
-		glVertex3f(m_Vertices[0].x, m_Vertices[0].y, m_Vertices[0].z);
-		glVertex3f(m_Vertices[2].x, m_Vertices[2].y, m_Vertices[2].z);
-
-		glVertex3f(m_Vertices[0].x, m_Vertices[0].y, m_Vertices[0].z);
-		glVertex3f(m_Vertices[3].x, m_Vertices[3].y, m_Vertices[3].z);
-
-		glVertex3f(m_Vertices[5].x, m_Vertices[5].y, m_Vertices[5].z);
-		glVertex3f(m_Vertices[1].x, m_Vertices[1].y, m_Vertices[1].z);
-
-		glVertex3f(m_Vertices[5].x, m_Vertices[5].y, m_Vertices[5].z);
-		glVertex3f(m_Vertices[3].x, m_Vertices[3].y, m_Vertices[3].z);
-
-		glVertex3f(m_Vertices[5].x, m_Vertices[5].y, m_Vertices[5].z);
-		glVertex3f(m_Vertices[7].x, m_Vertices[7].y, m_Vertices[7].z);
-
-		glVertex3f(m_Vertices[6].x, m_Vertices[6].y, m_Vertices[6].z);
-		glVertex3f(m_Vertices[2].x, m_Vertices[2].y, m_Vertices[2].z);
-
-		glVertex3f(m_Vertices[6].x, m_Vertices[6].y, m_Vertices[6].z);
-		glVertex3f(m_Vertices[3].x, m_Vertices[3].y, m_Vertices[3].z);
-
-		glVertex3f(m_Vertices[6].x, m_Vertices[6].y, m_Vertices[6].z);
-		glVertex3f(m_Vertices[7].x, m_Vertices[7].y, m_Vertices[7].z);
-
-		glVertex3f(m_Vertices[4].x, m_Vertices[4].y, m_Vertices[4].z);
-		glVertex3f(m_Vertices[2].x, m_Vertices[2].y, m_Vertices[2].z);
-
-		glVertex3f(m_Vertices[4].x, m_Vertices[4].y, m_Vertices[4].z);
-		glVertex3f(m_Vertices[1].x, m_Vertices[1].y, m_Vertices[1].z);
-
-		glVertex3f(m_Vertices[4].x, m_Vertices[4].y, m_Vertices[4].z);
-		glVertex3f(m_Vertices[7].x, m_Vertices[7].y, m_Vertices[7].z);
-	glEnd();
+	glBindVertexArray(m_VAO);
+	glDrawElements(GL_LINES, 
+		static_cast<unsigned int>(m_Indices.size()), GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
 }

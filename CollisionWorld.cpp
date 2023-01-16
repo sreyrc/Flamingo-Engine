@@ -1,6 +1,7 @@
 #include "CollisionWorld.h"
 
 #include "AABB.h"
+#include "OBB.h"
 
 #define NUM_MAX_COLLISIONS 1000
 
@@ -24,6 +25,11 @@ bool AABBAABB(BoundingVolume* bvA, BoundingVolume* bvB)
 	return true;
 }
 
+bool OBBOBB(BoundingVolume* bvA, BoundingVolume* bvB) {
+
+	return false;
+}
+
 CollisionWorld::CollisionWorld()
 {
 	isColliding.resize(static_cast<int>(BVType::NUM));
@@ -34,6 +40,9 @@ CollisionWorld::CollisionWorld()
 
 	isColliding[static_cast<int>(BVType::AABB)]
 		[static_cast<int>(BVType::AABB)] = &AABBAABB;
+
+	isColliding[static_cast<int>(BVType::OBB)]
+		[static_cast<int>(BVType::OBB)] = &OBBOBB;
 
 	m_CollisionQueueLevel1.resize(NUM_MAX_COLLISIONS);
 }
@@ -65,14 +74,25 @@ void CollisionWorld::Update()
 			if (isColliding[static_cast<int>(bvLevel1A->GetType())]
 				[static_cast<int>(bvLevel1B->GetType())](bvLevel1A, bvLevel1B)) {
 
-				m_Colliders[i]->IsInCollision(true);
-				m_Colliders[j]->IsInCollision(true);
+				m_Colliders[i]->m_BVLevel1->IsInCollision(true);
+				m_Colliders[j]->m_BVLevel1->IsInCollision(true);
 
 				m_CollisionQueueLevel1[m_NumCollisionsThisFrame++] =
 					CollisionObject(m_Colliders[i], m_Colliders[j]);
-				//m_CollisionQueueLevel1.push_back(
-				//	CollisionObject(m_Colliders[i], m_Colliders[j]));
 			}
+		}
+	}
+
+	for (int i = 0; i < m_NumCollisionsThisFrame; i++) {
+
+		auto bvLevel2A = m_CollisionQueueLevel1[i].m_ColliderA->m_BVLevel2;
+		auto bvLevel2B = m_CollisionQueueLevel1[i].m_ColliderB->m_BVLevel2;
+
+		if (isColliding[static_cast<int>(bvLevel2A->GetType())]
+			[static_cast<int>(bvLevel2B->GetType())](bvLevel2A, bvLevel2B)) {
+
+			m_CollisionQueueLevel1[i].m_ColliderA->m_BVLevel2->IsInCollision(true);
+			m_CollisionQueueLevel1[i].m_ColliderB->m_BVLevel2->IsInCollision(true);
 		}
 	}
 }
@@ -83,8 +103,9 @@ void CollisionWorld::ClearCollisionQueues()
 		m_CollisionQueueLevel1[i].m_ColliderA->IsInCollision(false);
 		m_CollisionQueueLevel1[i].m_ColliderB->IsInCollision(false);
 	}
+	//m_CollisionQueueLevel1.clear();
 	// TODO: Don't push and clear repeatedly. 
 	// Initialize with a fixed queue size
-	//m_NumCollisionsThisFrame = 0;
+	m_NumCollisionsThisFrame = 0;
 
 }

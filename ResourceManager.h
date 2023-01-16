@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <string.h>
 
 #include "Model.h"
 
@@ -17,13 +18,18 @@ public:
 
 		while (input) {
 			// Get name of scene and add to the list of scene names
-			std::string modelName;
-			std::getline(input, modelName, '\n');
-			if (modelName == "") break;
+			std::string modelFile; // abc.blend, abc.obj etc.
+			std::getline(input, modelFile, '\n');
+			if (modelFile == "") break;
 
+			std::string modelName = modelFile.substr(0, modelFile.find_first_of('.'));
 			m_ModelNames.push_back(modelName);
-			AddModel(modelName, "../res/" + modelName + ".obj");
+			
+			// abc ---> ../res/abc/abc.obj or whatever
+			AddModel(modelName, "../res/" + modelName + '/' + modelFile);
 		}
+
+		std::cout << "Loaded all models";
 	};
 
 	// Add a model with a desired name - if already present - Don't add

@@ -13,6 +13,7 @@ public:
 	Editor(GLFWwindow* window);
 
 	void Update( 
+		Camera* p_Camera,
 		ObjectManager* p_GetObjectManager,
 		ObjectFactory* p_ObjectFactory,
 		SceneManager* p_SceneManager,
