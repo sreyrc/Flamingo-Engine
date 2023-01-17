@@ -274,9 +274,12 @@ void Renderer::Draw(std::vector<Object*>& objects,
     //    obj->GetComponent<ModelComp*>()->Draw(*m_ModelShaderPBR);
     //}
 
-    SetupLineShaderVars();
+
 
     // Draw the Bounding Volumes of Colliders
+
+    SetupLineShaderVars();
+
     for (auto obj : objects) {
         auto col = obj->GetComponent<Collider*>();
         col->Draw(m_LineShader);

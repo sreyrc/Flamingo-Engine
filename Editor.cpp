@@ -31,7 +31,7 @@ void Editor::Update(
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
-    // Camera controls instructions
+    // Camera 
     ImGui::Begin("Camera Instructions"); {
         ImGui::Text("Use WASD to move around");
         ImGui::Text("Use the Arrow Keys to rotate the camera");
@@ -105,6 +105,7 @@ void Editor::Update(
         auto& objects = p_ObjectManager->m_ObjectList;
         
         if (ImGui::BeginTabBar("#Tabs")) {
+
             for (int i = 0; i < objects.size(); i++) {
 
                 //std::string str = "Obj " + std::to_string(i);
@@ -116,9 +117,6 @@ void Editor::Update(
                      if (ImGui::Button("Set Name")) {
                          if (std::string(objects[i]->m_ObjectNameBuff) != "") {
                              objects[i]->SetName(objects[i]->m_ObjectNameBuff);
-                         }
-                         else {
-                             ImGui::Text("Please name your scene");
                          }
                      }
 
@@ -150,8 +148,8 @@ void Editor::Update(
                                 if (is_selected)
                                     ImGui::SetItemDefaultFocus();
                             }
+                            ImGui::EndListBox();
                         }
-                        ImGui::EndListBox();
 
                         if (ImGui::Button("Select Model")) {
                             md->SetModel(p_ResourceManager);
@@ -159,6 +157,7 @@ void Editor::Update(
                             if (col) col->Initialize();
                         }
 
+                        // TODO: m_UseTextures should be in the model comp. Change this ASAP
                         ImGui::Checkbox("Use textures", 
                             &md->GetModel()->m_UseTextures);
                     }
@@ -177,11 +176,19 @@ void Editor::Update(
                     ImGui::EndTabItem();
                 }
             }
+            //if (ImGui::BeginTabItem("+")) {
+            //    p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
+            //    ImGui::EndTabItem();
+            //}
             ImGui::EndTabBar();
         }
     }
-    ImGui::Dummy(ImVec2(20, 20));
+    ImGui::Dummy(ImVec2(50, 50));
 
+    if (ImGui::Button("Add New Object")) {
+        p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
+    }
+    ImGui::Dummy(ImVec2(50, 50));
     ImGui::InputText("Scene name", p_SceneManager->m_SceneNameBuf, 
         sizeof(p_SceneManager->m_SceneNameBuf));
 

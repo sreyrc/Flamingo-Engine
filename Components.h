@@ -22,6 +22,8 @@ public:
 	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager) = 0;
 
+	virtual void SetDefaults(ResourceManager* p_ResourceManager) = 0;
+
 	virtual nlohmann::json::value_type Serialize () = 0;
 
 	inline void SetParent(Object* parent) { m_Parent = parent; }
@@ -37,7 +39,7 @@ public:
 	//Transform() {};
 	Transform() : m_Position(0),
 		m_Rotation(0),
-		m_Scale(0),
+		m_Scale(1),
 		m_WorldTransform(1.0f) {};
 
 	virtual ~Transform() {};
@@ -45,6 +47,7 @@ public:
 	virtual std::string GetName() { return "Transform"; }
 
 	virtual void Initialize() {}
+	virtual void SetDefaults(ResourceManager* p_ResourceManager) {}
 
 	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager = nullptr) {
@@ -112,6 +115,13 @@ public:
 	virtual ~Collider() {
 		delete m_BVLevel1;
 		delete m_BVLevel2;
+	}
+
+	virtual void SetDefaults(ResourceManager* p_ResourceManager) {
+		m_BVLevel1 = new AABB();
+		m_BVLevel2 = new OBB();
+		m_BVLevel1->SetParentCollider(this);
+		m_BVLevel2->SetParentCollider(this);
 	}
 
 	virtual void Initialize() {
@@ -192,6 +202,11 @@ public:
 
 	virtual std::string GetName() { return "Model"; }
 
+	virtual void SetDefaults(ResourceManager* p_ResourceManager) {
+		// Set the first model as default
+		m_Model = p_ResourceManager->GetModel(p_ResourceManager->m_ModelNames[0]);
+	}
+
 	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager) {
 
@@ -206,6 +221,7 @@ public:
 	}
 
 	inline Model* GetModel() { return m_Model; }
+
 	void SetModel(ResourceManager* p_ResourceManager) {
 		m_ModelName = m_ModelSelected;
 		m_Model = p_ResourceManager->GetModel(m_ModelSelected);
@@ -226,11 +242,13 @@ private:
 
 class Material : public Component {
 public:
-	Material() : m_Albedo(0), m_Metalness(0), m_Roughness(0), m_AO(0) {}
+	Material() : m_Albedo(1), m_Metalness(0.5), m_Roughness(0.5), m_AO(0) {}
 	virtual ~Material() {}
 	virtual void Update() {}
 	virtual std::string GetName() { return "Material"; }
 	virtual void Initialize() {}
+
+	virtual void SetDefaults(ResourceManager* p_ResourceManager) {}
 
 	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager = nullptr) {

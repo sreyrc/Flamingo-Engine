@@ -25,6 +25,14 @@ public:
 		}
 	}
 
+	void DeleteObject(std::string name) {
+		for (auto& obj : m_ObjectList) {
+			if (obj->GetName() == name) {
+				obj->MarkAsDeleted(true);
+			}
+		}
+	}
+
 	void DeleteAllObjects() {
 		for (auto it = m_ObjectList.begin(); it != m_ObjectList.end(); it++) {
 			delete *it;

@@ -50,9 +50,11 @@ AABB::AABB()
 
 void AABB::Initialize()
 {
+	// Clear all vertices
 	m_Vertices.clear();
 	m_VerticesInit.clear();
 
+	// Get the mesh using which we'll compute the initial AABB
 	auto mesh = m_ParentCollider->GetParent()->GetComponent<ModelComp*>();
 	auto vertices = mesh->GetModel()->GetAllVertices();
 
@@ -72,6 +74,7 @@ void AABB::Initialize()
 	m_VerticesInit.resize(8);
 	m_Vertices.resize(8);
 
+	// Now fill in these intial AABB vertices
 	FillAABBVertexValues(m_VerticesInit, m_Min, m_Max);
 }
 

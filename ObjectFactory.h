@@ -52,6 +52,23 @@ public:
 	//	object->AddComponent(m_ComponentCreators[componentName]->Create());
 	//}
 
+	void CreateObject(ObjectManager* p_ObjectManager, ResourceManager* p_ResourceManager) {
+		// Create a new object
+		Object* object = new Object("New_object");
+
+		// Create all components and add in the beginning
+		for (const auto& [compName, compCreator] : m_ComponentCreators) {
+			Component* comp = compCreator->Create();
+			// Set default values in components
+			comp->SetDefaults(p_ResourceManager);
+			object->AddComponent(comp);
+
+		}
+		object->Initialize();
+		p_ObjectManager->AddObject(object);
+		//p_ObjectManager->Initialize();
+	}
+
 private:
 	std::unordered_map<std::string,
 		ComponentCreator*> m_ComponentCreators;
