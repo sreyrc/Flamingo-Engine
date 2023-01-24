@@ -1,7 +1,7 @@
 ﻿/*
 **********************************************************
-Framework by Sreyash(Srey) Raychaudhuri
-Collision Detection / Echidna Engine
+By Sreyash (Srey) Raychaudhuri
+Collision Detection / Flamingo Engine
 **********************************************************
 * */
 

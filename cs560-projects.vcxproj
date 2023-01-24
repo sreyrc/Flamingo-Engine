@@ -219,6 +219,7 @@
     <ClInclude Include="Texture.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="DefShaderMultLights.frag" />
     <None Include="DefShaderGBufPass.frag" />
     <None Include="DefShaderGBufPass.vert" />
     <None Include="DefShaderGBufTex.frag" />
@@ -231,6 +232,8 @@
     <None Include="ModelShader.vert" />
     <None Include="ModelShaderPBR.frag" />
     <None Include="ModelShaderPBR.vert" />
+    <None Include="MultLocalLightsShader.frag" />
+    <None Include="MultLocalLightsShader.vert" />
     <None Include="Skybox.frag" />
     <None Include="Skybox.vert" />
     <None Include="SoftBody.frag" />

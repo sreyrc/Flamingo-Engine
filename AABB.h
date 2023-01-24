@@ -8,6 +8,7 @@ public:
 	virtual void Initialize();
 	virtual void Update();
 	virtual void Draw(Shader* shader);
+	glm::vec3 Support(glm::vec3 direction) { return glm::vec3(); }
 
 	inline glm::vec3 GetMin() { return m_Min; }
 	inline glm::vec3 GetMax() { return m_Max; }

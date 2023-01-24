@@ -82,6 +82,12 @@ void OBB::Update()
 	auto worldTransform = m_ParentCollider->GetParent()->
 		GetComponent<Transform*>()->GetWorldTransform();
 
+	// Transform initial points - if same as prev vec - no updates
+	if (glm::vec3(worldTransform * glm::vec4(m_VerticesInit[0], 1.0f)) 
+		== m_Vertices[0]) { return; }
+
+	// -- if this transformation is diff from prev frame
+	// 
 	// Transform the vertices of the OBB to world space according to tranform of GO
 	for (int i = 0; i < m_VerticesInit.size(); i++) {
 		m_Vertices[i] = glm::vec3(worldTransform * glm::vec4(m_VerticesInit[i], 1.0f));
@@ -99,7 +105,7 @@ void OBB::Update()
 
 void OBB::Draw(Shader* shader)
 {
-	if (m_InCollision) { shader->SetVec3("lineColor", glm::vec3(1.0f, 0.0f, 0.0f)); }
+	if (m_InCollision) { shader->SetVec3("lineColor", glm::vec3(1.0f, 1.0f, 0.0f)); }
 	else shader->SetVec3("lineColor", glm::vec3(1.0f, 1.0f, 1.0f));
 
 	glLineWidth(1.5f);
@@ -107,5 +113,24 @@ void OBB::Draw(Shader* shader)
 	glDrawElements(GL_LINES,
 		static_cast<unsigned int>(m_Indices.size()), GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
+}
+
+glm::vec3 OBB::Support(glm::vec3 direction)
+{
+	glm::vec3 maxPoint{};
+	float   maxDistance = -FLT_MAX;
+
+	// Go through all the vertices - 
+	// find point which has max dot product with the given dir i.e
+	// largest and longest projection along that dir
+	for (glm::vec3 vertex : m_Vertices) {
+		float distance = glm::dot(vertex, direction);
+		if (distance > maxDistance) {
+			maxDistance = distance;
+			maxPoint = vertex;
+		}
+	}
+
+	return maxPoint;
 }
 

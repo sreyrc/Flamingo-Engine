@@ -2,10 +2,6 @@
 
 out vec4 FragColor;
 in vec2 TexCoords;
-//in vec3 WorldPos;
-//in vec3 Normal;
-
-const int MAX_N_LIGHTS = 100;
 
 struct Light {
 	vec3 position;
@@ -14,12 +10,15 @@ struct Light {
 
 // G-Buffer textures
 // TODO: Use image2d eventually
-uniform sampler2D gPosition;
-uniform sampler2D gNormal;
-uniform sampler2D gDiffuse;
-uniform sampler2D gRoughMetal;
+uniform sampler2D g_Position;
+uniform sampler2D g_Normal;
+uniform sampler2D g_Diffuse;
+uniform sampler2D g_RoughMetal;
 
-uniform Light lights[MAX_N_LIGHTS];
+// global light/sun
+uniform Light globalLight;
+
+uniform float width, height;
 
 uniform vec3 camPos;
 
@@ -67,11 +66,12 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
 // ----------------------------------------------------------------------------
 void main()
 {		
-	vec3 FragPos = texture(gPosition, TexCoords).rgb;
-	vec3 N = texture(gNormal, TexCoords).rgb;
-	vec3 albedo = texture(gDiffuse, TexCoords).rgb;
-	float roughness = texture(gRoughMetal, TexCoords).r;
-	float metalness = texture(gRoughMetal, TexCoords).g;
+    vec2 uv = gl_FragCoord.xy / vec2(width, height);
+	vec3 FragPos = texture(g_Position, uv).rgb;
+	vec3 N = texture(g_Normal, uv).rgb;
+	vec3 albedo = texture(g_Diffuse, uv).rgb;
+	float roughness = texture(g_RoughMetal, uv).r;
+	float metalness = texture(g_RoughMetal, uv).g;
 
     //vec3 N = normalize(Normal);
     vec3 V = normalize(camPos - FragPos);
@@ -83,54 +83,38 @@ void main()
 
     // reflectance equation
     vec3 Lo = vec3(0.0);
-    for(int i = 0; i < 4; ++i) 
-    {
-        // calculate per-light radiance
-        vec3 L = normalize(lights[i].position - FragPos);
-        vec3 H = normalize(V + L);
-        float distance = length(lights[i].position - FragPos);
-        float attenuation = 1.0 / (distance * distance);
-        vec3 radiance = lights[i].color * attenuation;
 
-        // Cook-Torrance BRDF
-        float NDF = DistributionGGX(N, H, roughness);   
-        float G   = GeometrySmith(N, V, L, roughness);      
-        vec3 F    = fresnelSchlick(clamp(dot(H, V), 0.0, 1.0), F0);
-           
-        vec3 numerator    = NDF * G * F; 
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
-        vec3 specular = numerator / denominator;
+    // calculate per-light radiance
+    vec3 L = normalize(globalLight.position - FragPos);
+    vec3 H = normalize(V + L);
+    float distance    = length(globalLight.position - FragPos);
+    //float attenuation = 1.0 / (distance * distance);
+    vec3 radiance     = globalLight.color;// * attenuation;        
         
-        // kS is equal to Fresnel
-        vec3 kS = F;
-        // for energy conservation, the diffuse and specular light can't
-        // be above 1.0 (unless the surface emits light); to preserve this
-        // relationship the diffuse component (kD) should equal 1.0 - kS.
-        vec3 kD = vec3(1.0) - kS;
-        // multiply kD by the inverse metalness such that only non-metals 
-        // have diffuse lighting, or a linear blend if partly metal (pure metals
-        // have no diffuse light).
-        kD *= 1.0 - metalness;	  
-
-        // scale light by NdotL
-        float NdotL = max(dot(N, L), 0.0);        
-
-        // add to outgoing radiance Lo
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL;  
-        // note that we already multiplied the BRDF by the Fresnel (kS) 
-        // so we won't multiply by kS again
-    }   
-    
-    // ambient lighting (note that the next IBL tutorial will replace 
-    // this ambient lighting with environment lighting).
+    // cook-torrance brdf
+    float NDF = DistributionGGX(N, H, roughness);        
+    float G   = GeometrySmith(N, V, L, roughness);      
+    vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
+        
+    vec3 kS = F;
+    vec3 kD = vec3(1.0) - kS;
+    kD *= 1.0 - metalness;	  
+        
+    vec3 numerator    = NDF * G * F;
+    float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
+    vec3 specular     = numerator / denominator;  
+            
+    // add to outgoing radiance Lo
+    float NdotL = max(dot(N, L), 0.0);                
+    Lo += (kD * albedo / PI + specular) * radiance * NdotL; 
+    //}   
+  
     vec3 ambient = vec3(0.03) * albedo;
-
     vec3 color = ambient + Lo;
-
-    // HDR tonemapping
+	
     color = color / (color + vec3(1.0));
-    // gamma correct
-    color = pow(color, vec3(1.0/2.2)); 
-
+    color = pow(color, vec3(1.0/2.2));  
+   
     FragColor = vec4(color, 1.0);
+   
 }

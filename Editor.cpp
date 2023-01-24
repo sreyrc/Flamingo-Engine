@@ -53,17 +53,29 @@ void Editor::Update(
 
     // Scene lights
     ImGui::Begin("Lights"); {
-        int numLights = static_cast<int>(p_Renderer->m_Lights.size());
+
+        // Global light
+        ImGui::SliderFloat3("Global Light Position",
+            &p_Renderer->m_GlobalLight.m_Position.x, -50.0f, 50.0f);
+        ImGui::SliderFloat3("Global Light Color",
+            &p_Renderer->m_GlobalLight.m_Color.x, 0.0f, 500.0f);
+
+        // Local lights
+        int numLights = static_cast<int>(p_Renderer->m_LocalLights.size());
         for (int i = 0; i < numLights; i++) {
 
             std::string lightNumText = "Light " + std::to_string(i);
             ImGui::Text(lightNumText.c_str());
             std::string posLabel = "Position ##" + lightNumText;
             std::string colorLabel = "Color ##" + lightNumText;
+            std::string rangeLabel = "Range ##" + lightNumText;
             ImGui::SliderFloat3(posLabel.c_str(),
-                &p_Renderer->m_Lights[i].position.x, -50.0f, 50.0f);
+                &p_Renderer->m_LocalLights[i].m_Position.x, -50.0f, 50.0f);
+            //ImGui::ColorEdit3(colorLabel.c_str(), &p_Renderer->m_LocalLights[i].m_Color.x);       
             ImGui::SliderFloat3(colorLabel.c_str(),
-                &p_Renderer->m_Lights[i].color.x, 0.0f, 300.0f);
+                &p_Renderer->m_LocalLights[i].m_Color.x, 0.0f, 50.0f);
+            ImGui::SliderFloat(rangeLabel.c_str(),
+                &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 5.0f);
 
             ImGui::Dummy(ImVec2(20, 20));
         }
@@ -127,7 +139,7 @@ void Editor::Update(
                     if (tr) {
                         ImGui::SliderFloat3("Position", &tr->m_Position.x, -10.0f, 10.0f);
                         ImGui::SliderFloat3("Scale", &tr->m_Scale.x, 0.1f, 1.0f);
-                        ImGui::SliderFloat3("Rotation", &tr->m_Rotation.x, -10.0f, 10.0f);
+                        ImGui::SliderFloat3("Rotation", &tr->m_Rotation.x, -90.0f, 90.0f);
                     }
 
                     ImGui::Dummy(ImVec2(20, 20));

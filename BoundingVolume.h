@@ -12,6 +12,7 @@ enum class BVType {
 	AABB,
 	SPHERE,
 	OBB,
+	KDOP,
 	NUM
 };
 
@@ -38,8 +39,12 @@ public:
 	inline void SetParentCollider(Collider* par) { m_ParentCollider = par; };
 	inline void IsInCollision(bool inCol) { m_InCollision = inCol; }
 	inline bool InCollision() { return m_InCollision; }
+	inline std::vector<glm::vec3> GetVertices() { return m_Vertices; }
 	virtual void Initialize() = 0;
 	virtual void Update() = 0;
 	virtual void Draw(Shader* shader) = 0;
+
+	// Returns the vertex of the collider furthest along the given dir
+	virtual glm::vec3 Support(glm::vec3 direction) = 0;
 };
 

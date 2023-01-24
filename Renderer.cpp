@@ -12,19 +12,20 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_ViewPos = glm::vec3(0.0f, 0.1f, 0.6f);
     m_DiffuseColor = glm::vec3(1.0f, 0.0f, 1.0f);
     m_SpecularColor = glm::vec3(1.0f, 1.0f, 1.0f);
-    m_LightPos = glm::vec3(2.0f, 2.5f, 2.5f);
-    m_LightColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    m_GlobalLight.m_Position = glm::vec3(2.0f, 2.5f, 2.5f);
+    m_GlobalLight.m_Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
     m_LineWidth = 1.0f;
-    m_LineColor = glm::vec3(1.0f, 1.0f, 1.0f);
+    //m_LineColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
     // Creating shaders
     m_ModelShader = new Shader("ModelShader.vert", "ModelShader.frag");
     m_ModelShaderPBR = new Shader("ModelShaderPBR.vert", "ModelShaderPBR.frag");
     m_DefShaderGBuffer = new Shader("DefShaderGBufPass.vert", "DefShaderGBufPass.frag");
-    m_DefShaderLighting = new Shader("DefShaderLightingPass.vert", "DefShaderLightingPass.frag");
     m_DefShaderGBufTex = new Shader("DefShaderGBufTex.vert", "DefShaderGBufTex.frag");
+    m_DefShaderLighting = new Shader("DefShaderLightingPass.vert", "DefShaderLightingPass.frag");
     m_LineShader = new Shader("LineShader.vert", "LineShader.frag"); 
+    m_MultLocalLightsShader = new Shader("MultLocalLightsShader.vert", "MultLocalLightsShader.frag");
     //m_SkyBoxShader = new Shader("Skybox.vert", "Skybox.frag");
 
     // Set samplers for textures which will be used to fill in G-Buffer
@@ -35,13 +36,26 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderGBufTex->SetInt("metallicMap", 3);
     m_DefShaderGBufTex->Unuse();
 
-    // Set samplers
+    // Set samplers. Values will be read from these
     m_DefShaderLighting->Use();
-    m_DefShaderLighting->SetInt("gPosition", 0);
-    m_DefShaderLighting->SetInt("gNormal", 1);
-    m_DefShaderLighting->SetInt("gDiffuse", 2);
-    m_DefShaderLighting->SetInt("gRoughMetal", 3);
+    m_DefShaderLighting->SetInt("g_Position", 0);
+    m_DefShaderLighting->SetInt("g_Normal", 1);
+    m_DefShaderLighting->SetInt("g_Diffuse", 2);
+    m_DefShaderLighting->SetInt("g_RoughMetal", 3);
+    m_DefShaderLighting->SetFloat("width", (float)SCREEN_WIDTH);
+    m_DefShaderLighting->SetFloat("height", (float)SCREEN_HEIGHT);
     m_DefShaderLighting->Unuse();
+
+    //Preferably get rid of this shader later. And try doing all with one shader
+    m_MultLocalLightsShader->Use();
+    m_MultLocalLightsShader->SetInt("g_Position", 0);
+    m_MultLocalLightsShader->SetInt("g_Normal", 1);
+    m_MultLocalLightsShader->SetInt("g_Diffuse", 2);
+    m_MultLocalLightsShader->SetInt("g_RoughMetal", 3);
+    m_MultLocalLightsShader->SetFloat("width", (float)SCREEN_WIDTH);
+    m_MultLocalLightsShader->SetFloat("height", (float)SCREEN_HEIGHT);
+    m_MultLocalLightsShader->Unuse();
+
 
     //m_SkyBoxShader->Use();
     //m_SkyBoxShader->SetInt("skybox", 0);
@@ -66,6 +80,9 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 
     // Create an FBO with 4 color attachments/buffers
     FBOForDefShading.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 4);
+
+    SphereMesh sphereMesh;
+    m_SphereMesh = sphereMesh;
 
     //float skyboxVertices[] = {
     //    // positions          
@@ -141,6 +158,9 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 void Renderer::Draw(std::vector<Object*>& objects, 
     int SCREEN_WIDTH, int SCREEN_HEIGHT)
 {
+    m_ViewMat = m_Camera->GetViewMatrix();
+    m_ViewPos = m_Camera->m_Position;
+
     glEnable(GL_DEPTH_TEST);
  
     // Set BG color and clear buffers
@@ -149,10 +169,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     //glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-    //m_SkyBoxShader->Use();
-
-    m_ViewMat = m_Camera->GetViewMatrix();
-    m_ViewPos = m_Camera->m_Position;
+    //m_SkyBoxShader->Use()
 
     //glm::mat4 view = glm::mat4(glm::mat3(m_ViewMat));
     //m_SkyBoxShader->SetMat4("view", view);
@@ -194,6 +211,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
             // Use the shader that takes in textures
             m_DefShaderGBufTex->Use();
+            // TODO: Set proj just once
             m_DefShaderGBufTex->SetMat4("proj", m_ProjMat);
             m_DefShaderGBufTex->SetMat4("view", m_ViewMat);
             m_DefShaderGBufTex->SetMat4("model",
@@ -231,22 +249,62 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
     m_DefShaderLighting->Use();
 
-     // Bind all G-Buffer textures
-     // TODO: Replace with i < numColorAttachments or sth
+    // Bind all G-Buffer textures
+    // TODO: Replace with i < numColorAttachments or sth
     for (int i = 0; i < 4; i++) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, FBOForDefShading.m_GBuffers[i]);
     }
 
-    SetLightingVars(m_DefShaderLighting);
-
+    // Set vars for the global light source
+    m_DefShaderLighting->SetVec3("globalLight.position", m_GlobalLight.m_Position);
+    m_DefShaderLighting->SetVec3("globalLight.color", m_GlobalLight.m_Color);
     m_DefShaderLighting->SetVec3("camPos", m_ViewPos);
 
     m_QuadDefShadingOutput.BindVAO();
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
+    // MULTIPLE LOCAL LIGHTS PASS
+
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glEnable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+
+    m_MultLocalLightsShader->Use();
+    m_MultLocalLightsShader->SetVec3("camPos", m_ViewPos);
+    m_MultLocalLightsShader->SetMat4("view", m_ViewMat);
+    m_MultLocalLightsShader->SetMat4("proj", m_ProjMat);
+
+    // Bind all G-Buffer textures
+    for (int i = 0; i < 4; i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, FBOForDefShading.m_GBuffers[i]);
+    }
+
+    for (const auto& localLight : m_LocalLights) {
+        m_MultLocalLightsShader->SetVec3("localLight.position", localLight.m_Position);
+        m_MultLocalLightsShader->SetVec3("localLight.color", localLight.m_Color);
+        m_MultLocalLightsShader->SetFloat("localLight.r", localLight.m_Range);
+
+        // Create transformation for this light sphere
+        m_ModelMat = glm::translate(glm::mat4(1.0f), localLight.m_Position);
+        m_ModelMat = glm::scale(m_ModelMat, glm::vec3(localLight.m_Range, 
+            localLight.m_Range, localLight.m_Range));
+        m_MultLocalLightsShader->SetMat4("model", m_ModelMat);
+
+        m_SphereMesh.BindVAO();
+        glDrawElements(GL_TRIANGLE_STRIP, 
+            m_SphereMesh.GetIndexCount(), GL_UNSIGNED_INT, 0);
+    }
+
+    // Remember to disable blending before rendering next frame
+    glDisable(GL_BLEND);
+    glDisable(GL_CULL_FACE);
 
     // ------- FORWARD SHADING -------
     //// Draw the models
@@ -275,7 +333,6 @@ void Renderer::Draw(std::vector<Object*>& objects,
     //}
 
 
-
     // Draw the Bounding Volumes of Colliders
 
     SetupLineShaderVars();
@@ -287,22 +344,35 @@ void Renderer::Draw(std::vector<Object*>& objects,
 }
 
 void Renderer::Deserialize(std::string path) {
-    m_Lights.clear();
+    m_LocalLights.clear();
     std::ifstream sceneFile(path);
     nlohmann::json allData = nlohmann::json::parse(sceneFile);
     auto& data = allData["Lights"];
+    
+    m_GlobalLight.m_Position = glm::vec3(data["Global_Light"]["Position"][0],
+        data["Global_Light"]["Position"][1], data["Global_Light"]["Position"][2]);
 
-    for (auto it = data.begin(); it != data.end(); it++) {
+    m_GlobalLight.m_Color = glm::vec3(data["Global_Light"]["Color"][0],
+        data["Global_Light"]["Color"][1], data["Global_Light"]["Color"][2]);
+
+    m_GlobalLight.m_Range = FLT_MAX;
+
+    auto localLightsData = data["Local_Lights"];
+
+    // begin + 1 since first one was the sun - rest all local lights
+    for (auto it = localLightsData.begin(); it != localLightsData.end(); it++) {
         auto lightObj = *it;
         Light light;
 
-        light.position = glm::vec3(lightObj["Position"][0],
+        light.m_Position = glm::vec3(lightObj["Position"][0],
             lightObj["Position"][1], lightObj["Position"][2]);
         
-        light.color = glm::vec3(lightObj["Color"][0],
+        light.m_Color = glm::vec3(lightObj["Color"][0],
             lightObj["Color"][1], lightObj["Color"][2]);
 
-        m_Lights.push_back(light);
+        light.m_Range = lightObj["Range"];
+
+        m_LocalLights.push_back(light);
     }
 
     std::cout << "Configured";
@@ -314,41 +384,46 @@ void Renderer::Deserialize(std::string path) {
 nlohmann::json::value_type Renderer::Serialize()
 {
     nlohmann::json lightsData;
-    for (int i = 0; i < m_Lights.size(); i++) {
+
+    // Save global light / sun
+    nlohmann::json currSunData;
+    currSunData["Position"] = nlohmann::json::array({
+            m_GlobalLight.m_Position.x, m_GlobalLight.m_Position.y, m_GlobalLight.m_Position.z
+        });
+
+    currSunData["Color"] = nlohmann::json::array({
+            m_GlobalLight.m_Color.x, m_GlobalLight.m_Color.y, m_GlobalLight.m_Color.z
+        });
+
+    lightsData["Global_Light"] = currSunData;
+
+    nlohmann::json localLightsData;
+
+    // For the local lights
+    for (int i = 0; i < m_LocalLights.size(); i++) {
         
         nlohmann::json currLightData;
         currLightData["Position"] = nlohmann::json::array ({ 
-                m_Lights[i].position.x, 
-                m_Lights[i].position.y,
-                m_Lights[i].position.z
+                m_LocalLights[i].m_Position.x, 
+                m_LocalLights[i].m_Position.y,
+                m_LocalLights[i].m_Position.z
             });
 
         currLightData["Color"] = nlohmann::json::array({
-                m_Lights[i].color.x,
-                m_Lights[i].color.y,
-                m_Lights[i].color.z
+                m_LocalLights[i].m_Color.x,
+                m_LocalLights[i].m_Color.y,
+                m_LocalLights[i].m_Color.z
             });
 
-        lightsData["Light_" + std::to_string(i)] = currLightData;
+        currLightData["Range"] = m_LocalLights[i].m_Range;
+
+        localLightsData["Light_" + std::to_string(i)] = currLightData;
     }
+
+    lightsData["Local_Lights"] = localLightsData;
 
     return lightsData;
 }
-
-// Set variables in the shader for the model
-void Renderer::SetLightingVars(Shader* shader) {
-
-    for (int i = 0; i < m_Lights.size(); i++) {
-        // Set light position and color (for now, just one light source)
-        shader->SetVec3("lights[" + std::to_string(i) + "].position", m_Lights[i].position);
-        shader->SetVec3("lights[" + std::to_string(i) + "].color", m_Lights[i].color);
-    }
-
-    // Set other vars
-    shader->SetInt("numberOfLights", static_cast<GLint>(m_Lights.size()));
-    shader->SetVec3("camPos", m_ViewPos);
-}
-
 
 // Pass variables to the line shader
 void Renderer::SetupLineShaderVars() {

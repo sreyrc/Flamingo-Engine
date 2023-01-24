@@ -37,9 +37,9 @@ protected:
 class Transform : public Component {
 public:
 	//Transform() {};
-	Transform() : m_Position(0),
-		m_Rotation(0),
-		m_Scale(1),
+	Transform() : m_Position(0.0f),
+		m_Rotation(0.0f),
+		m_Scale(1.0f),
 		m_WorldTransform(1.0f) {};
 
 	virtual ~Transform() {};
@@ -63,8 +63,10 @@ public:
 
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_Position);
 		glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), m_Scale);
-		glm::mat4 rotateMat = glm::rotate(glm::mat4(1.0f),
-			glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
+		glm::mat4 rotateMat(1.0f);
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.x), glm::vec3(1, 0, 0));
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
 		m_WorldTransform = translationMat * rotateMat * scaleMat;
 	};
 
@@ -86,9 +88,12 @@ public:
 		// TODO: Factor in rotation properly
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_Position);
 		glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), m_Scale);
-		glm::mat4 rotateMat = glm::rotate(glm::mat4(1.0f),
-			glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
-		//glm::mat4 rotateMat = glm::mat4_cast(m_Rotation);
+		glm::mat4 rotateMat(1.0f);// = glm::rotate(glm::mat4(1.0f),
+		//	glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
+		////glm::mat4 rotateMat = glm::mat4_cast(m_Rotation);
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.x), glm::vec3(1, 0, 0));
+		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
 		m_WorldTransform = translationMat * rotateMat * scaleMat;
 	}
 
@@ -242,7 +247,7 @@ private:
 
 class Material : public Component {
 public:
-	Material() : m_Albedo(1), m_Metalness(0.5), m_Roughness(0.5), m_AO(0) {}
+	Material() : m_Albedo(1.0f), m_Metalness(0.5f), m_Roughness(0.5f), m_AO(0.0f) {}
 	virtual ~Material() {}
 	virtual void Update() {}
 	virtual std::string GetName() { return "Material"; }

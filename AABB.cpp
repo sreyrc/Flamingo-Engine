@@ -3,7 +3,7 @@
 
 
 // Vertices for drawing
-void FillAABBVertexValues(std::vector<glm::vec3>& vertices, glm::vec3 min, glm::vec3 max) {
+void FillAABBVertexValuesForDrawing(std::vector<glm::vec3>& vertices, glm::vec3 min, glm::vec3 max) {
 
 	vertices[0] = min;
 	vertices[1] = glm::vec3(min.x + fabs(max.x - min.x), min.y, min.z);
@@ -54,47 +54,52 @@ void AABB::Initialize()
 	m_Vertices.clear();
 	m_VerticesInit.clear();
 
-	// Get the mesh using which we'll compute the initial AABB
-	auto mesh = m_ParentCollider->GetParent()->GetComponent<ModelComp*>();
-	auto vertices = mesh->GetModel()->GetAllVertices();
+	//// Get the mesh using which we'll compute the initial AABB
+	//auto mesh = m_ParentCollider->GetParent()->GetComponent<ModelComp*>();
+	//auto vertices = mesh->GetModel()->GetAllVertices();
 
-	m_Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	m_Min = { FLT_MAX, FLT_MAX, FLT_MAX };
+	//m_Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	//m_Min = { FLT_MAX, FLT_MAX, FLT_MAX };
 
-	for (const auto& v : vertices) {
-		if (v.Position.x > m_Max.x) { m_Max.x = v.Position.x; }
-		if (v.Position.y > m_Max.y) { m_Max.y = v.Position.y; }
-		if (v.Position.z > m_Max.z) { m_Max.z = v.Position.z; }
+	//for (const auto& v : vertices) {
+	//	if (v.Position.x > m_Max.x) { m_Max.x = v.Position.x; }
+	//	if (v.Position.y > m_Max.y) { m_Max.y = v.Position.y; }
+	//	if (v.Position.z > m_Max.z) { m_Max.z = v.Position.z; }
 
-		if (v.Position.x < m_Min.x) { m_Min.x = v.Position.x; }
-		if (v.Position.y < m_Min.y) { m_Min.y = v.Position.y; }
-		if (v.Position.z < m_Min.z) { m_Min.z = v.Position.z; }
-	}
+	//	if (v.Position.x < m_Min.x) { m_Min.x = v.Position.x; }
+	//	if (v.Position.y < m_Min.y) { m_Min.y = v.Position.y; }
+	//	if (v.Position.z < m_Min.z) { m_Min.z = v.Position.z; }
+	//}
 
 	m_VerticesInit.resize(8);
 	m_Vertices.resize(8);
 
 	// Now fill in these intial AABB vertices
-	FillAABBVertexValues(m_VerticesInit, m_Min, m_Max);
+	FillAABBVertexValuesForDrawing(m_VerticesInit, m_Min, m_Max);
 }
 
 void AABB::Update()
 {
-	// TODO: Recalculate only when world transform changes
+	// Grab the set of vertices from the second level BV
+	auto vBVLevel2 = m_ParentCollider->GetParent()
+		->GetComponent<Collider*>()->m_BVLevel2->GetVertices();
 
-	auto worldTransform = m_ParentCollider->GetParent()->
-		GetComponent<Transform*>()->GetWorldTransform();
 
-	// Transform the vertices of the AABB to world space according to tranform of GO
-	for (int i = 0; i < m_VerticesInit.size(); i++) {
-		m_Vertices[i] = glm::vec3(worldTransform * glm::vec4(m_VerticesInit[i], 1.0f));
-	}
+	//// TODO: Remove this crap
+
+	//auto worldTransform = m_ParentCollider->GetParent()->
+	//	GetComponent<Transform*>()->GetWorldTransform();
+
+	//// Transform the vertices of the AABB to world space according to tranform of GO
+	//for (int i = 0; i < m_VerticesInit.size(); i++) {
+	//	m_Vertices[i] = glm::vec3(worldTransform * glm::vec4(m_VerticesInit[i], 1.0f));
+	//}
 
 	// Now find a new AABB from the transformed AABB.
 	m_Max = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 	m_Min = { FLT_MAX, FLT_MAX, FLT_MAX };
 
-	for (const auto& v : m_Vertices) {
+	for (const auto& v : vBVLevel2) {
 		if (v.x > m_Max.x) { m_Max.x = v.x; }
 		if (v.y > m_Max.y) { m_Max.y = v.y; }
 		if (v.z > m_Max.z) { m_Max.z = v.z; }
@@ -104,7 +109,7 @@ void AABB::Update()
 		if (v.z < m_Min.z) { m_Min.z = v.z; }
 	}
 
-	FillAABBVertexValues(m_Vertices, m_Min, m_Max);
+	FillAABBVertexValuesForDrawing(m_Vertices, m_Min, m_Max);
 
 	// Fill in the new data for drawing
 	glBindVertexArray(m_VAO);

@@ -8,12 +8,12 @@
 class SphereMesh {
 
 public:
-	SphereMesh(): mVAO(0), mVBO(0), mIBO(0), mIndexCount(0) {
+	SphereMesh(): m_VAO(0), m_VBO(0), m_IBO(0), m_IndexCount(0) {
 
-        glGenVertexArrays(1, &mVAO);
+        glGenVertexArrays(1, &m_VAO);
 
-        glGenBuffers(1, &mVBO);
-        glGenBuffers(1, &mIBO);
+        glGenBuffers(1, &m_VBO);
+        glGenBuffers(1, &m_IBO);
 
         std::vector<glm::vec3> positions;
         std::vector<glm::vec2> uv;
@@ -130,10 +130,10 @@ public:
                 mVertexData.push_back(bitangents[i].z);
             }
         }
-        glBindVertexArray(mVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, mVBO);
+        glBindVertexArray(m_VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
         glBufferData(GL_ARRAY_BUFFER, mVertexData.size() * sizeof(float), &mVertexData[0], GL_STATIC_DRAW);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIBO);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_IBO);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, mIndices.size() * sizeof(unsigned int), &mIndices[0], GL_STATIC_DRAW);
         unsigned int stride = (3 + 2 + 3 + 3 + 3) * sizeof(float);
         glEnableVertexAttribArray(0);
@@ -153,7 +153,7 @@ public:
 	}
 
 	void BindVAO() {
-		glBindVertexArray(mVAO);
+		glBindVertexArray(m_VAO);
 	}
 
 private:
@@ -173,10 +173,10 @@ private:
         return -1;
     }
 
-	GLuint mVAO, mVBO, mIBO;
+	GLuint m_VAO, m_VBO, m_IBO;
 
 	std::vector<float> mVertexData;
 	std::vector<unsigned int> mIndices;
 
-    unsigned int mIndexCount;
+    unsigned int m_IndexCount;
 };

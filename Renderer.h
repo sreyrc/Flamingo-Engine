@@ -15,8 +15,9 @@
 #include "QuadMesh.h"
 
 struct Light {
-    glm::vec3 color;
-    glm::vec3 position;
+    glm::vec3 m_Color;
+    glm::vec3 m_Position;
+    float m_Range;
 };
 
 class Renderer
@@ -44,18 +45,17 @@ public:
     glm::vec3 m_DiffuseColor;
     glm::vec3 m_SpecularColor;
 
-    // TODO: Use as directional lights
-    glm::vec3 m_LightPos;
-    glm::vec3 m_LightColor;
-    glm::vec3 m_LineColor;
-
+    // Large global light - the sun
+    Light m_GlobalLight;
+    
     // All the lights in the scene;
-    std::vector<Light> m_Lights;
+    std::vector<Light> m_LocalLights;
 
     // Shaders: 
     Shader* m_ModelShader, * m_ModelShaderPBR,
-        *m_DefShaderGBuffer, *m_DefShaderLighting,
-        *m_DefShaderGBufTex, * m_DefShaderLightingTex,
+        *m_DefShaderGBuffer, * m_DefShaderLighting,
+        *m_DefShaderGBufTex,
+        *m_MultLocalLightsShader,
         *m_LineShader;
 
     // A ref to the scene camera
@@ -71,6 +71,7 @@ public:
     // G Buffer for Def. Shading
     FBO FBOForDefShading;
 
+    // Full-screen quad on which final image is output
     QuadMesh m_QuadDefShadingOutput;
 
     unsigned int m_CubeMapTexID;
@@ -83,7 +84,7 @@ public:
     bool m_DrawMassPoints = true;
 
 private:
-    void SetLightingVars(Shader* shader);
+    //void SetLightingVars(Shader* shader);
     void SetupLineShaderVars();
     //void DrawGrid();
 };

@@ -256,5 +256,14 @@
     <None Include="DefShaderGBufTex.frag">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="DefShaderMultLights.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="MultLocalLightsShader.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="MultLocalLightsShader.frag">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
