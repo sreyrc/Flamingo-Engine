@@ -49,7 +49,9 @@ public:
 			GBufColorAttachments[i] = GL_COLOR_ATTACHMENT0 + i;
 		}
 		
-		glDrawBuffers(numColorAttachments, &GBufColorAttachments[0]);
+		if (numColorAttachments > 0) {
+			glDrawBuffers(numColorAttachments, &GBufColorAttachments[0]);
+		}
 
 		// Check for completeness/correctness
 		int status = (int)glCheckFramebufferStatus(GL_FRAMEBUFFER);

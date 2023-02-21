@@ -21,10 +21,10 @@ uniform sampler2D gRoughMetal;
 
 uniform Light lights[MAX_N_LIGHTS];
 
-uniform vec3 camPos;
+uniform vec3 viewPos;
 
 const float PI = 3.14159265359;
-// ----------------------------------------------------------------------------
+
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness * roughness;
@@ -38,7 +38,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     return nom / denom;
 }
-// ----------------------------------------------------------------------------
+
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     float r = (roughness + 1.0);
@@ -49,7 +49,7 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
     return nom / denom;
 }
-// ----------------------------------------------------------------------------
+
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
     float NdotV = max(dot(N, V), 0.0);
@@ -59,12 +59,12 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
     return ggx1 * ggx2;
 }
-// ----------------------------------------------------------------------------
+
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
-// ----------------------------------------------------------------------------
+
 void main()
 {		
 	vec3 FragPos = texture(gPosition, TexCoords).rgb;
@@ -74,7 +74,7 @@ void main()
 	float metalness = texture(gRoughMetal, TexCoords).g;
 
     //vec3 N = normalize(Normal);
-    vec3 V = normalize(camPos - FragPos);
+    vec3 V = normalize(viewPos - FragPos);
 
     // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
     // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    

@@ -46,10 +46,10 @@ public:
 
 	virtual std::string GetName() { return "Transform"; }
 
-	virtual void Initialize() {}
-	virtual void SetDefaults(ResourceManager* p_ResourceManager) {}
+	void Initialize() {}
+	void SetDefaults(ResourceManager* p_ResourceManager) {}
 
-	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
+	void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager = nullptr) {
 
 		m_Position = glm::vec3(jsonObj["Position"][0],
@@ -84,7 +84,7 @@ public:
 		return jsonObject;
 	}
 
-	virtual void Update() {
+	void Update() {
 		// TODO: Factor in rotation properly
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_Position);
 		glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), m_Scale);
@@ -122,19 +122,19 @@ public:
 		delete m_BVLevel2;
 	}
 
-	virtual void SetDefaults(ResourceManager* p_ResourceManager) {
+	void SetDefaults(ResourceManager* p_ResourceManager) {
 		m_BVLevel1 = new AABB();
 		m_BVLevel2 = new OBB();
 		m_BVLevel1->SetParentCollider(this);
 		m_BVLevel2->SetParentCollider(this);
 	}
 
-	virtual void Initialize() {
+	void Initialize() {
 		m_BVLevel1->Initialize();
 		m_BVLevel2->Initialize();
 	}
 
-	virtual std::string GetName() { return "Collider"; }
+	std::string GetName() { return "Collider"; }
 
 	void Draw(Shader* shader) {
 		m_BVLevel1->Draw(shader);
@@ -174,7 +174,7 @@ public:
 		return jsonObject;
 	}
 
-	virtual void Update() {
+	void Update() {
 		m_BVLevel1->Update();
 
 		// TODO: Activate this when ready
@@ -201,18 +201,19 @@ class ModelComp : public Component {
 public:
 	ModelComp() : m_Model(nullptr) {};
 	ModelComp(Model* model) : m_Model(model) {}
-	virtual ~ModelComp() {}
-	virtual void Update() {}
-	virtual void Initialize() {}
+	~ModelComp() {}
+	void Update() {}
+	void Initialize() {}
 
-	virtual std::string GetName() { return "Model"; }
+	std::string GetName() { return "Model"; }
 
-	virtual void SetDefaults(ResourceManager* p_ResourceManager) {
+	void SetDefaults(ResourceManager* p_ResourceManager) {
 		// Set the first model as default
+		m_ModelName = p_ResourceManager->m_ModelNames[0];
 		m_Model = p_ResourceManager->GetModel(p_ResourceManager->m_ModelNames[0]);
 	}
 
-	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
+	void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager) {
 
 		m_ModelName = jsonObj;
@@ -248,14 +249,14 @@ private:
 class Material : public Component {
 public:
 	Material() : m_Albedo(1.0f), m_Metalness(0.5f), m_Roughness(0.5f), m_AO(0.0f) {}
-	virtual ~Material() {}
-	virtual void Update() {}
-	virtual std::string GetName() { return "Material"; }
-	virtual void Initialize() {}
+	~Material() {}
+	void Update() {}
+	std::string GetName() { return "Material"; }
+	void Initialize() {}
 
-	virtual void SetDefaults(ResourceManager* p_ResourceManager) {}
+	void SetDefaults(ResourceManager* p_ResourceManager) {}
 
-	virtual void Deserialize(nlohmann::json::value_type& jsonObj,
+	void Deserialize(nlohmann::json::value_type& jsonObj,
 		ResourceManager* p_ResourceManager = nullptr) {
 
 		m_Albedo = glm::vec3(jsonObj["Albedo"][0],

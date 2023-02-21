@@ -6,6 +6,8 @@
 
 #include <glm/glm.hpp>
 
+#include <random>
+
 Editor::Editor(GLFWwindow* window) {
 
     // Dear Imgui initialization
@@ -43,11 +45,18 @@ void Editor::Update(
     ImGui::End();
 
     ImGui::Begin("G-Buffers"); {
-        int vecSize = p_Renderer->FBOForDefShading.m_GBuffers.size();
+        int vecSize = p_Renderer->m_FBOForDefShading.m_GBuffers.size();
         for (int i = 0; i < vecSize; i++) {
-            ImGui::Image((ImTextureID)p_Renderer->FBOForDefShading.m_GBuffers[i],
+            ImGui::Image((ImTextureID)p_Renderer->m_FBOForDefShading.m_GBuffers[i],
                 ImVec2(384, 216), ImVec2(0, 1), ImVec2(1, 0));
         }
+    }
+    ImGui::End();
+
+
+    ImGui::Begin("Shadow depth buffer"); {
+        ImGui::Image((ImTextureID)p_Renderer->m_FBOLightDepth.m_GBuffers[0],
+            ImVec2(384, 384), ImVec2(0, 1), ImVec2(1, 0));
     }
     ImGui::End();
 
@@ -71,17 +80,39 @@ void Editor::Update(
             std::string rangeLabel = "Range ##" + lightNumText;
             ImGui::SliderFloat3(posLabel.c_str(),
                 &p_Renderer->m_LocalLights[i].m_Position.x, -50.0f, 50.0f);
-            //ImGui::ColorEdit3(colorLabel.c_str(), &p_Renderer->m_LocalLights[i].m_Color.x);       
             ImGui::SliderFloat3(colorLabel.c_str(),
-                &p_Renderer->m_LocalLights[i].m_Color.x, 0.0f, 50.0f);
+                &p_Renderer->m_LocalLights[i].m_Color.x, 0.0f, 200.0f);
             ImGui::SliderFloat(rangeLabel.c_str(),
-                &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 5.0f);
+                &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 200.0f);
 
             ImGui::Dummy(ImVec2(20, 20));
         }
 
-        //TODO: Add a separate section for editing renderer params
-        //ImGui::SliderFloat3("Light pos", &renderer->m_LightPos.x, -100, 100);
+        // TODO: This might be temporary
+
+        if (ImGui::Button("Add a LOT of lights")) {
+
+            unsigned seedColor = std::chrono::steady_clock::now().time_since_epoch().count();
+            std::default_random_engine eColor(seedColor);
+
+            unsigned seedRange = std::chrono::steady_clock::now().time_since_epoch().count();
+            std::default_random_engine eRange(seedRange);
+
+            glm::vec3 pos = glm::vec3(0), color = glm::vec3(50);
+            float range = 5.0f;
+            int k = 0;
+            for (int i = -40; i < 40; i += 4) {
+                for (int j = -40; j < 40; j += 4) {
+                    pos = glm::vec3(i, 3.0f, j);
+                    // TODO: Assign random values here
+                    range = 7.0f;
+                    color = glm::vec3(20 + (eColor() % 50), 
+                        20 + (eColor() % 50), 20 + (eColor() % 50));
+                    //range = 2;
+                    p_Renderer->AddLight(pos, color, range);
+                }
+            }
+        }
     }
     ImGui::End();
 
@@ -138,7 +169,7 @@ void Editor::Update(
                     Transform* tr = objects[i]->GetComponent<Transform*>();
                     if (tr) {
                         ImGui::SliderFloat3("Position", &tr->m_Position.x, -10.0f, 10.0f);
-                        ImGui::SliderFloat3("Scale", &tr->m_Scale.x, 0.1f, 1.0f);
+                        ImGui::SliderFloat3("Scale", &tr->m_Scale.x, 0.1f, 2.0f);
                         ImGui::SliderFloat3("Rotation", &tr->m_Rotation.x, -90.0f, 90.0f);
                     }
 
@@ -183,15 +214,10 @@ void Editor::Update(
                         ImGui::ColorEdit3("Albedo", &mt->m_Albedo.x);
                         ImGui::SliderFloat("Metalness", &mt->m_Metalness, 0.0f, 1.0f);
                         ImGui::SliderFloat("Roughness", &mt->m_Roughness, 0.0f, 1.0f);
-                        ImGui::SliderFloat("AO", &mt->m_AO, 0.0f, 1.0f);
                     }
                     ImGui::EndTabItem();
                 }
             }
-            //if (ImGui::BeginTabItem("+")) {
-            //    p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
-            //    ImGui::EndTabItem();
-            //}
             ImGui::EndTabBar();
         }
     }
@@ -199,6 +225,51 @@ void Editor::Update(
 
     if (ImGui::Button("Add New Object")) {
         p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
+    }
+
+    // TODO: Super hacky and most probably temporary - refactor later or just remove
+    if (ImGui::Button("Add a LOT of Objects")) {
+
+        // For material properties. any value between 0 and 1 for both hence same 
+        // rangome engine can be used for both
+        unsigned seeObjProp = std::chrono::steady_clock::now().time_since_epoch().count();
+        std::default_random_engine eObjProp(seeObjProp);
+
+        int obj_num = 0;
+        for (int i = -40; i < 40; i += 16) {
+            for (int j = -40; j < 40; j += 16) {
+
+                Object* object = new Object("Newobj" + std::to_string(obj_num++));
+                // Create all components and add in the beginning
+                Transform* tr = new Transform();
+                ModelComp* md = new ModelComp();
+                Material* mat = new Material();
+
+                // Set random mat properties
+                mat->m_Albedo = glm::vec3(
+                    eObjProp() / static_cast<float>(eObjProp.max()),
+                    eObjProp() / static_cast<float>(eObjProp.max()),
+                    eObjProp() / static_cast<float>(eObjProp.max()));
+                mat->m_Metalness = eObjProp() / static_cast<float>(eObjProp.max());
+                mat->m_Roughness = eObjProp() / static_cast<float>(eObjProp.max());
+                
+                md->SetDefaults(p_ResourceManager);
+                //mat->SetDefaults(p_ResourceManager);
+                
+                tr->m_Position = glm::vec3(i, 0, j);
+                tr->m_Scale = glm::vec3(1 + 
+                    (eObjProp() / static_cast<float>(eObjProp.max())));
+
+                // Add all the components
+                object->AddComponent(tr);
+                object->AddComponent(md);
+                object->AddComponent(mat);
+
+                object->Initialize();
+                p_ObjectManager->AddObject(object);
+            }
+        }
+        //p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
     }
     ImGui::Dummy(ImVec2(50, 50));
     ImGui::InputText("Scene name", p_SceneManager->m_SceneNameBuf, 

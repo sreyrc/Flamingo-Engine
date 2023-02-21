@@ -16,7 +16,6 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_GlobalLight.m_Color = glm::vec3(1.0f, 1.0f, 1.0f);
 
     m_LineWidth = 1.0f;
-    //m_LineColor = glm::vec3(1.0f, 1.0f, 1.0f);
 
     // Creating shaders
     m_ModelShader = new Shader("ModelShader.vert", "ModelShader.frag");
@@ -27,6 +26,8 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_LineShader = new Shader("LineShader.vert", "LineShader.frag"); 
     m_MultLocalLightsShader = new Shader("MultLocalLightsShader.vert", "MultLocalLightsShader.frag");
     //m_SkyBoxShader = new Shader("Skybox.vert", "Skybox.frag");
+
+    m_ShadowShader = new Shader("Shadow.vert", "Shadow.frag");
 
     // Set samplers for textures which will be used to fill in G-Buffer
     m_DefShaderGBufTex->Use();
@@ -42,6 +43,7 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderLighting->SetInt("g_Normal", 1);
     m_DefShaderLighting->SetInt("g_Diffuse", 2);
     m_DefShaderLighting->SetInt("g_RoughMetal", 3);
+    m_DefShaderLighting->SetInt("shadowMap", 4);
     m_DefShaderLighting->SetFloat("width", (float)SCREEN_WIDTH);
     m_DefShaderLighting->SetFloat("height", (float)SCREEN_HEIGHT);
     m_DefShaderLighting->Unuse();
@@ -56,6 +58,15 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_MultLocalLightsShader->SetFloat("height", (float)SCREEN_HEIGHT);
     m_MultLocalLightsShader->Unuse();
 
+    m_ShadowProj = glm::perspective(
+        glm::radians(60.0f), 1000.0f / 1000.0f, 0.1f, 1000.0f);
+
+    m_BMat = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f));
+    m_BMat = glm::scale(m_BMat, glm::vec3(0.5f));
+
+    m_ShadowShader->Use();
+    m_ShadowShader->SetMat4("proj", m_ShadowProj);
+    m_ShadowShader->Unuse();
 
     //m_SkyBoxShader->Use();
     //m_SkyBoxShader->SetInt("skybox", 0);
@@ -73,13 +84,13 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 
     //m_SphereMesh = new SphereMesh();
 
-    m_ProjMat = glm::perspective(glm::radians(m_Camera->m_Zoom),
-        (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
-
     m_SkyBoxVAO = 0; m_SkyBoxVBO = 0;
 
     // Create an FBO with 4 color attachments/buffers
-    FBOForDefShading.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 4);
+    m_FBOForDefShading.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 4);
+
+    // For storing depth values. Needed for shadow-mapping
+    m_FBOLightDepth.CreateFBO(1000, 1000, 1);
 
     SphereMesh sphereMesh;
     m_SphereMesh = sphereMesh;
@@ -158,15 +169,21 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 void Renderer::Draw(std::vector<Object*>& objects, 
     int SCREEN_WIDTH, int SCREEN_HEIGHT)
 {
+    m_ProjMat = glm::perspective(glm::radians(m_Camera->m_Zoom),
+        (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
+
     m_ViewMat = m_Camera->GetViewMatrix();
     m_ViewPos = m_Camera->m_Position;
+
+    m_ShadowView = glm::lookAt(m_GlobalLight.m_Position,
+        glm::vec3(1), glm::vec3(0, 1, 0));
 
     glEnable(GL_DEPTH_TEST);
  
     // Set BG color and clear buffers
     //glClearColor(m_BgColor.x, m_BgColor.y, m_BgColor.z, 1.0f);
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     //glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
     //m_SkyBoxShader->Use()
@@ -189,12 +206,34 @@ void Renderer::Draw(std::vector<Object*>& objects,
     //    m_SphereMesh->GetIndexCount(), GL_UNSIGNED_INT, 0);
 
 
-    // ---- DEFERRED SHADING ---
+    // ---- SHADOW PASS ----
+    
+    m_FBOLightDepth.Bind();
+    
+    glViewport(0, 0, 1000, 1000);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    m_ShadowShader->Use();
+    m_ShadowShader->SetMat4("view", m_ShadowView);
+
+    // Draw objects from the global light's POV
+    for (auto obj : objects) {
+        m_ShadowShader->SetMat4("model", obj->GetComponent<Transform*>()->GetWorldTransform());
+        obj->GetComponent<ModelComp*>()->Draw(*m_ShadowShader);
+    }
+
+    // Unbind the FBO and unuse the shader
+    m_FBOLightDepth.Unbind();
+    m_ShadowShader->Unuse();
+
+
+    // ---- DEFERRED SHADING ----
     //  
     // PASS 1 - G-BUFFER PASS
 
     // Bind this FBO first. So that all output is to this 
-    FBOForDefShading.Bind();
+    m_FBOForDefShading.Bind();
 
     glViewport(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -211,6 +250,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
             // Use the shader that takes in textures
             m_DefShaderGBufTex->Use();
+
             // TODO: Set proj just once
             m_DefShaderGBufTex->SetMat4("proj", m_ProjMat);
             m_DefShaderGBufTex->SetMat4("view", m_ViewMat);
@@ -243,7 +283,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
     // PASS 2 - LIGHTING PASS
 
     // Now output is to the screen
-    FBOForDefShading.Unbind();
+    m_FBOForDefShading.Unbind();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -253,19 +293,26 @@ void Renderer::Draw(std::vector<Object*>& objects,
     // TODO: Replace with i < numColorAttachments or sth
     for (int i = 0; i < 4; i++) {
         glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, FBOForDefShading.m_GBuffers[i]);
+        glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[i]);
     }
 
     // Set vars for the global light source
     m_DefShaderLighting->SetVec3("globalLight.position", m_GlobalLight.m_Position);
     m_DefShaderLighting->SetVec3("globalLight.color", m_GlobalLight.m_Color);
-    m_DefShaderLighting->SetVec3("camPos", m_ViewPos);
+    m_DefShaderLighting->SetVec3("viewPos", m_ViewPos);
+
+    // Shadow matrix
+    glm::mat4 shadowMat = m_BMat * m_ShadowProj * m_ShadowView;
+    m_DefShaderLighting->SetMat4("shadowMat", shadowMat);
+
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, m_FBOLightDepth.m_GBuffers[0]);
 
     m_QuadDefShadingOutput.BindVAO();
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
-    // MULTIPLE LOCAL LIGHTS PASS
+    // --- MULTIPLE LOCAL LIGHTS PASS --- 
 
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -276,14 +323,14 @@ void Renderer::Draw(std::vector<Object*>& objects,
     glBlendFunc(GL_ONE, GL_ONE);
 
     m_MultLocalLightsShader->Use();
-    m_MultLocalLightsShader->SetVec3("camPos", m_ViewPos);
+    m_MultLocalLightsShader->SetVec3("viewPos", m_ViewPos);
     m_MultLocalLightsShader->SetMat4("view", m_ViewMat);
     m_MultLocalLightsShader->SetMat4("proj", m_ProjMat);
 
     // Bind all G-Buffer textures
     for (int i = 0; i < 4; i++) {
         glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, FBOForDefShading.m_GBuffers[i]);
+        glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[i]);
     }
 
     for (const auto& localLight : m_LocalLights) {
@@ -297,9 +344,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
             localLight.m_Range, localLight.m_Range));
         m_MultLocalLightsShader->SetMat4("model", m_ModelMat);
 
-        m_SphereMesh.BindVAO();
-        glDrawElements(GL_TRIANGLE_STRIP, 
-            m_SphereMesh.GetIndexCount(), GL_UNSIGNED_INT, 0);
+        m_SphereMesh.Draw();
     }
 
     // Remember to disable blending before rendering next frame
@@ -337,9 +382,10 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
     SetupLineShaderVars();
 
+    // TODO: Enable colliders later
     for (auto obj : objects) {
         auto col = obj->GetComponent<Collider*>();
-        col->Draw(m_LineShader);
+        if (col) col->Draw(m_LineShader);
     }
 }
 

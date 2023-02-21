@@ -265,5 +265,11 @@
     <None Include="MultLocalLightsShader.frag">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shadow.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shadow.frag">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

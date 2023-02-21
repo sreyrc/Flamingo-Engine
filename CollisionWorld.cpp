@@ -5,6 +5,27 @@
 
 #define NUM_MAX_COLLISIONS 1000
 
+
+bool AABBAABB(BoundingVolume* bvA, BoundingVolume* bvB)
+{
+	AABB* aabbA = static_cast<AABB*>(bvA);
+	AABB* aabbB = static_cast<AABB*>(bvB);
+
+	glm::vec3 aMax = aabbA->GetMax();
+	glm::vec3 aMin = aabbA->GetMin();
+
+	glm::vec3 bMax = aabbB->GetMax();
+	glm::vec3 bMin = aabbB->GetMin();
+
+	// Exit with no intersection if separated along an axis
+	if (aMax[0] < bMin[0] || aMin[0] > bMax[0]) return false;
+	if (aMax[1] < bMin[1] || aMin[1] > bMax[1]) return false;
+	if (aMax[2] < bMin[2] || aMin[2] > bMax[2]) return false;
+
+	// Overlapping on all axes means AABBs are intersecting
+	return true;
+}
+
 struct Simplex {
 private:
 	std::array<glm::vec3, 4> m_points;
@@ -38,26 +59,6 @@ public:
 	auto end()   const { return m_points.end() - (4 - m_size); }
 };
 
-
-bool AABBAABB(BoundingVolume* bvA, BoundingVolume* bvB)
-{
-	AABB* aabbA = static_cast<AABB*>(bvA);
-	AABB* aabbB = static_cast<AABB*>(bvB);
-
-	glm::vec3 aMax = aabbA->GetMax();
-	glm::vec3 aMin = aabbA->GetMin();
-
-	glm::vec3 bMax = aabbB->GetMax();
-	glm::vec3 bMin = aabbB->GetMin();
-
-	// Exit with no intersection if separated along an axis
-	if (aMax[0] < bMin[0] || aMin[0] > bMax[0]) return false;
-	if (aMax[1] < bMin[1] || aMin[1] > bMax[1]) return false;
-	if (aMax[2] < bMin[2] || aMin[2] > bMax[2]) return false;
-
-	// Overlapping on all axes means AABBs are intersecting
-	return true;
-}
 
 bool SameDirection(
 	const glm::vec3& direction,
@@ -176,6 +177,8 @@ bool NextSimplex(
 	return false;
 }
 
+
+
 bool GJK(BoundingVolume* bvA, BoundingVolume* bvB) {
 
 	// Intial support point
@@ -205,7 +208,8 @@ bool GJK(BoundingVolume* bvA, BoundingVolume* bvB) {
 	}
 }
 
-CollisionWorld::CollisionWorld()
+CollisionWorld::CollisionWorld() 
+	: m_NumCollisionsThisFrame(0)
 {
 	isColliding.resize(static_cast<int>(BVType::NUM));
 
@@ -282,5 +286,4 @@ void CollisionWorld::ClearCollisionQueues()
 	// TODO: Don't push and clear repeatedly. 
 	// Initialize with a fixed queue size
 	m_NumCollisionsThisFrame = 0;
-
 }

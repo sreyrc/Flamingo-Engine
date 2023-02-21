@@ -69,7 +69,6 @@ public:
 		nlohmann::json sceneData;
 		sceneData["Objects"] = p_GameObjectManager->Serialize();
 		sceneData["Lights"] = p_Renderer->Serialize();
-		//std::string newSceneName = "Scene" + std::to_string(++m_SceneNum);
 		std::ofstream savedScene("../scenes/" + newSceneName + ".json");
 		savedScene << std::setw(4) << sceneData;
 

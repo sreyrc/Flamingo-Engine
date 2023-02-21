@@ -8,7 +8,7 @@
 class SphereMesh {
 
 public:
-	SphereMesh(): m_VAO(0), m_VBO(0), m_IBO(0), m_IndexCount(0) {
+	SphereMesh(): m_VAO(0), m_VBO(0), m_IBO(0) {
 
         glGenVertexArrays(1, &m_VAO);
 
@@ -156,6 +156,12 @@ public:
 		glBindVertexArray(m_VAO);
 	}
 
+    void Draw() {
+        glBindVertexArray(m_VAO);
+        glDrawElements(GL_TRIANGLE_STRIP,
+            mIndices.size(), GL_UNSIGNED_INT, 0);
+    }
+
 private:
     int FindSimilarVertex(
         std::vector<glm::vec3>& positions,
@@ -177,6 +183,4 @@ private:
 
 	std::vector<float> mVertexData;
 	std::vector<unsigned int> mIndices;
-
-    unsigned int m_IndexCount;
 };

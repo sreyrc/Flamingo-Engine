@@ -1,7 +1,7 @@
 ﻿/*
 **********************************************************
 By Sreyash (Srey) Raychaudhuri
-Collision Detection / Flamingo Engine
+Flamingo Engine
 **********************************************************
 * */
 
@@ -43,6 +43,8 @@ const int SCREEN_HEIGHT = 1080;
 // timing
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
+
+bool editorOn = true;
 
 void PrintVec3(glm::vec3 vec3) {
     std::cout << vec3.x << ", " << vec3.y << ", " << vec3.z << '\n';
@@ -118,6 +120,9 @@ int main() {
         p_ObjectFactory, p_ResourceManager, p_CollisionWorld, p_Renderer);
 
     lastFrame = static_cast<float>(glfwGetTime());
+
+    printf("%s\n", glGetString(GL_VERSION));
+
 
     // Update loop
     // -----------
@@ -207,4 +212,8 @@ void processInput(GLFWwindow* window, Camera* camera)
     // To Reset to initial Camera positions
     if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS)
         camera->ProcessKeyboard(RESET, deltaTime);
+
+    if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS) {
+        editorOn = !editorOn;
+    }
 }

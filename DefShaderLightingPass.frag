@@ -15,15 +15,23 @@ uniform sampler2D g_Normal;
 uniform sampler2D g_Diffuse;
 uniform sampler2D g_RoughMetal;
 
+// Consists of depth values from the 
+// global light's POV 
+uniform sampler2D shadowMap;
+
+// To convert from world space to 
+// shadow-coord tex space
+uniform mat4 shadowMat;
+
 // global light/sun
 uniform Light globalLight;
 
 uniform float width, height;
 
-uniform vec3 camPos;
+uniform vec3 viewPos;
 
 const float PI = 3.14159265359;
-// ----------------------------------------------------------------------------
+
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness * roughness;
@@ -37,7 +45,7 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 
     return nom / denom;
 }
-// ----------------------------------------------------------------------------
+
 float GeometrySchlickGGX(float NdotV, float roughness)
 {
     float r = (roughness + 1.0);
@@ -48,7 +56,7 @@ float GeometrySchlickGGX(float NdotV, float roughness)
 
     return nom / denom;
 }
-// ----------------------------------------------------------------------------
+
 float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 {
     float NdotV = max(dot(N, V), 0.0);
@@ -58,12 +66,12 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
     return ggx1 * ggx2;
 }
-// ----------------------------------------------------------------------------
+
 vec3 fresnelSchlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
-// ----------------------------------------------------------------------------
+
 void main()
 {		
     vec2 uv = gl_FragCoord.xy / vec2(width, height);
@@ -74,10 +82,10 @@ void main()
 	float metalness = texture(g_RoughMetal, uv).g;
 
     //vec3 N = normalize(Normal);
-    vec3 V = normalize(camPos - FragPos);
+    vec3 V = normalize(viewPos - FragPos);
 
-    // calculate reflectance at normal incidence; if dia-electric (like plastic) use F0 
-    // of 0.04 and if it's a metal, use the albedo color as F0 (metallic workflow)    
+    // Calculate reflectance at normal incidence; If non-metal use F0 
+    // of 0.04 and if it's a metal, use the albedo color as F0
     vec3 F0 = vec3(0.04); 
     F0 = mix(F0, albedo, metalness);
 
@@ -88,14 +96,14 @@ void main()
     vec3 L = normalize(globalLight.position - FragPos);
     vec3 H = normalize(V + L);
     float distance    = length(globalLight.position - FragPos);
-    //float attenuation = 1.0 / (distance * distance);
-    vec3 radiance     = globalLight.color;// * attenuation;        
+    vec3 radiance     = globalLight.color;
         
-    // cook-torrance brdf
+    // Cook-Torrance BRDF
     float NDF = DistributionGGX(N, H, roughness);        
     float G   = GeometrySmith(N, V, L, roughness);      
     vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);       
-        
+    
+    // ks
     vec3 kS = F;
     vec3 kD = vec3(1.0) - kS;
     kD *= 1.0 - metalness;	  
@@ -104,13 +112,21 @@ void main()
     float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
     vec3 specular     = numerator / denominator;  
             
-    // add to outgoing radiance Lo
     float NdotL = max(dot(N, L), 0.0);                
     Lo += (kD * albedo / PI + specular) * radiance * NdotL; 
-    //}   
-  
+
     vec3 ambient = vec3(0.03) * albedo;
-    vec3 color = ambient + Lo;
+    float shadow = 0.0f;
+
+    vec4 shadowCoord = shadowMat * vec4(FragPos, 1.0f);
+    vec2 shadowIndex = shadowCoord.xy/shadowCoord.w;
+
+    float bias = 0.005f;
+    float lightDepth = texture(shadowMap, shadowIndex).w;
+    float pixelDepth = shadowCoord.w;
+    if (pixelDepth - bias > lightDepth) { shadow = 1.0f; }
+
+    vec3 color = ambient + (Lo * (1 - shadow));
 	
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));  

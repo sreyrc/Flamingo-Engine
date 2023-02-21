@@ -15,9 +15,14 @@
 #include "QuadMesh.h"
 
 struct Light {
-    glm::vec3 m_Color;
     glm::vec3 m_Position;
+    glm::vec3 m_Color;
     float m_Range;
+
+    Light() : m_Position(0), m_Color(1), m_Range(1) {}
+
+    Light(glm::vec3& position, glm::vec3& color, float range) 
+        : m_Position(position), m_Color(color), m_Range(range) {}
 };
 
 class Renderer
@@ -30,6 +35,10 @@ public:
     
     void Deserialize(std::string path);
     nlohmann::json::value_type Serialize();
+
+    void AddLight(glm::vec3 position, glm::vec3 color, float range) {
+        m_LocalLights.push_back(Light(position, color, range));
+    }
 
     float m_LineWidth;
 
@@ -56,7 +65,8 @@ public:
         *m_DefShaderGBuffer, * m_DefShaderLighting,
         *m_DefShaderGBufTex,
         *m_MultLocalLightsShader,
-        *m_LineShader;
+        *m_LineShader,
+        *m_ShadowShader;
 
     // A ref to the scene camera
     Camera* m_Camera;
@@ -65,11 +75,17 @@ public:
     glm::mat4 m_ProjMat, m_ViewMat, m_ModelMat;
     glm::mat4 m_RotMat;
 
+    glm::mat4 m_ShadowProj, m_ShadowView, m_BMat;
+
     // Mesh for sphere
     SphereMesh m_SphereMesh;
 
     // G Buffer for Def. Shading
-    FBO FBOForDefShading;
+    FBO m_FBOForDefShading;
+
+    // Store depth values when rendered from
+    // the global light's perspective - req for shadows
+    FBO m_FBOLightDepth;
 
     // Full-screen quad on which final image is output
     QuadMesh m_QuadDefShadingOutput;

@@ -15,7 +15,8 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<unsigned int> indices,
 // Draw the mesh
 void Mesh::Draw(Shader& shader)
 {
-    // Bind textures
+    // TODO: Reactivate textures once shadows work
+    //Bind textures
     int unit = 0;
     for (int i = 0; i < textures.size(); i++) {
         if (textures[i]->GetType() == "Normal") {

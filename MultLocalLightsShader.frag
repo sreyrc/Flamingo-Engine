@@ -19,7 +19,7 @@ uniform Light localLight;
 
 uniform float width, height;
 
-uniform vec3 camPos;
+uniform vec3 viewPos;
 
 const float PI = 3.14159265359;
 
@@ -75,7 +75,7 @@ void main()
 
     float distFromLight = length(localLight.position - FragPos);
 
-    // if outside of range of light
+    // If outside of range of light
     if (distFromLight > localLight.r) 
     {
         FragColor = vec4(0);
@@ -87,7 +87,7 @@ void main()
 	    float roughness = texture(g_RoughMetal, uv).r;
 	    float metalness = texture(g_RoughMetal, uv).g;
 
-        vec3 V = normalize(camPos - FragPos);
+        vec3 V = normalize(viewPos - FragPos);
    
         vec3 F0 = vec3(0.04); 
         F0 = mix(F0, albedo, metalness);
@@ -123,8 +123,6 @@ void main()
 
         // HDR tonemapping
         color = color / (color + vec3(1.0));
-        // gamma correct
-        color = pow(color, vec3(1.0/2.2)); 
 
         FragColor = vec4(color, 1.0);
     }

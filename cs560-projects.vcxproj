@@ -234,6 +234,8 @@
     <None Include="ModelShaderPBR.vert" />
     <None Include="MultLocalLightsShader.frag" />
     <None Include="MultLocalLightsShader.vert" />
+    <None Include="Shadow.frag" />
+    <None Include="Shadow.vert" />
     <None Include="Skybox.frag" />
     <None Include="Skybox.vert" />
     <None Include="SoftBody.frag" />
