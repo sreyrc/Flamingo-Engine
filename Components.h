@@ -91,7 +91,7 @@ public:
 		jsonObject["Scale"] =
 			nlohmann::json::array({ m_Scale.x, m_Scale.y, m_Scale.z });
 		jsonObject["Rotation"] =
-			nlohmann::json::array({ m_Rotation.x, m_Rotation.y, m_Rotation.z });
+			nlohmann::json::array({ m_RotationEuler.x, m_RotationEuler.y, m_RotationEuler.z });
 
 		return jsonObject;
 	}
