@@ -7,6 +7,7 @@
 #include "ObjectManager.h"
 #include "ResourceManager.h"
 #include "ComponentCreators.h"
+#include "CollisionWorld.h"
 
 
 class ObjectFactory {
@@ -52,19 +53,24 @@ public:
 	//	object->AddComponent(m_ComponentCreators[componentName]->Create());
 	//}
 
-	void CreateObject(ObjectManager* p_ObjectManager, ResourceManager* p_ResourceManager) {
+	void CreateObject(ObjectManager* p_ObjectManager, ResourceManager* p_ResourceManager,
+		CollisionWorld* p_CollisionWorld) {
 		// Create a new object
 		Object* object = new Object("New_object" + std::to_string(obj_num));
 
 		// Create all components and add in the beginning
 		for (const auto& [compName, compCreator] : m_ComponentCreators) {
 			Component* comp = compCreator->Create();
+
 			// Set default values in components
 			comp->SetDefaults(p_ResourceManager);
 			object->AddComponent(comp);
-
 		}
 		object->Initialize();
+
+		auto col = object->GetComponent<Collider*>();
+		if (col) { p_CollisionWorld->AddCollider(col); }
+
 		p_ObjectManager->AddObject(object);
 		//p_ObjectManager->Initialize();
 	}

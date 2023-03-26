@@ -7,6 +7,7 @@
 
 #include "Camera.h"
 #include "Shader.h"
+#include "ComputeShader.h"
 #include "SphereMesh.h"
 
 #include "Object.h"
@@ -68,6 +69,9 @@ public:
         *m_LineShader,
         *m_ShadowShader;
 
+    ComputeShader* m_HorizontalBlur, 
+        *m_VerticalBlur;
+
     // A ref to the scene camera
     Camera* m_Camera;
 
@@ -87,12 +91,21 @@ public:
     // the global light's perspective - req for shadows
     FBO m_FBOLightDepth;
 
+    // Blurred shadow-map
+    FBO m_FBOLightDepthBlurred;
+
     // Full-screen quad on which final image is output
     QuadMesh m_QuadDefShadingOutput;
+
+    int m_KernelHalfWidth = 5;
+
+    float m_CenterRadius = 10.0f;
 
     unsigned int m_CubeMapTexID;
     unsigned int m_SkyBoxVAO;
     unsigned int m_SkyBoxVBO;
+
+    unsigned m_Block, m_Block1;
 
     // TODO: Remove this stuff
     bool m_DrawSprings = true;

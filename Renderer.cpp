@@ -26,8 +26,10 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_LineShader = new Shader("LineShader.vert", "LineShader.frag"); 
     m_MultLocalLightsShader = new Shader("MultLocalLightsShader.vert", "MultLocalLightsShader.frag");
     //m_SkyBoxShader = new Shader("Skybox.vert", "Skybox.frag");
-
     m_ShadowShader = new Shader("Shadow.vert", "Shadow.frag");
+    
+    m_HorizontalBlur = new ComputeShader("HorizontalBlur.comp");
+    m_VerticalBlur = new ComputeShader("VerticalBlur.comp");
 
     // Set samplers for textures which will be used to fill in G-Buffer
     m_DefShaderGBufTex->Use();
@@ -48,7 +50,7 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderLighting->SetFloat("height", (float)SCREEN_HEIGHT);
     m_DefShaderLighting->Unuse();
 
-    //Preferably get rid of this shader later. And try doing all with one shader
+    // Set samplers and other vars
     m_MultLocalLightsShader->Use();
     m_MultLocalLightsShader->SetInt("g_Position", 0);
     m_MultLocalLightsShader->SetInt("g_Normal", 1);
@@ -59,7 +61,7 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_MultLocalLightsShader->Unuse();
 
     m_ShadowProj = glm::perspective(
-        glm::radians(60.0f), 1000.0f / 1000.0f, 0.1f, 1000.0f);
+        glm::radians(60.0f), 1.0f, 0.1f, 1000.0f);
 
     m_BMat = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f));
     m_BMat = glm::scale(m_BMat, glm::vec3(0.5f));
@@ -90,10 +92,16 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_FBOForDefShading.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 4);
 
     // For storing depth values. Needed for shadow-mapping
-    m_FBOLightDepth.CreateFBO(1000, 1000, 1);
+    m_FBOLightDepth.CreateFBO(1024, 1024, 1);
+
+    // For storing depth values. Needed for shadow-mapping
+    m_FBOLightDepthBlurred.CreateFBO(1024, 1024, 1);
 
     SphereMesh sphereMesh;
     m_SphereMesh = sphereMesh;
+
+    glGenBuffers(1, &m_Block); // Generates block
+    glGenBuffers(1, &m_Block1); // Generates block
 
     //float skyboxVertices[] = {
     //    // positions          
@@ -205,16 +213,25 @@ void Renderer::Draw(std::vector<Object*>& objects,
     //glDrawElements(GL_TRIANGLE_STRIP,
     //    m_SphereMesh->GetIndexCount(), GL_UNSIGNED_INT, 0);
 
-
-    // ---- SHADOW PASS ----
     
+    // ---- SHADOW PASS ----
+    //
+    //glEnable(GL_CULL_FACE);
+    //glCullFace(GL_FRONT);
+
     m_FBOLightDepth.Bind();
     
-    glViewport(0, 0, 1000, 1000);
+    glViewport(0, 0, 1024, 1024);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+    float lightDistance =  glm::length(m_GlobalLight.m_Position - glm::vec3(1));
+    float minDepth = lightDistance - m_CenterRadius;
+    float maxDepth = lightDistance + m_CenterRadius;
+
     m_ShadowShader->Use();
+    m_ShadowShader->SetFloat("minDepth", minDepth);
+    m_ShadowShader->SetFloat("maxDepth", maxDepth);
     m_ShadowShader->SetMat4("view", m_ShadowView);
 
     // Draw objects from the global light's POV
@@ -226,6 +243,97 @@ void Renderer::Draw(std::vector<Object*>& objects,
     // Unbind the FBO and unuse the shader
     m_FBOLightDepth.Unbind();
     m_ShadowShader->Unuse();
+
+
+    glDisable(GL_CULL_FACE);
+
+
+    // --- GAUSSIAN BLUR USING CONVOLUTION BLUR FILTER ---
+
+    // Fill in and send weights
+    int kernelSize = 2 * m_KernelHalfWidth + 1;
+    float sum = 0;
+    float s = m_KernelHalfWidth / 2.0f;
+    if (m_KernelHalfWidth == 0) s = 1;
+    std::vector<float> weights(kernelSize);
+    for (int i = 0; i < kernelSize; i++) {
+        weights[i] = pow(glm::e<float>(), -0.5f * pow((i - m_KernelHalfWidth) / s, 2));
+        sum += weights[i];
+    }
+
+    for (int i = 0; i < kernelSize; i++) {
+        weights[i] = weights[i] / sum;
+    }
+
+    // Horizontal Blur
+    m_HorizontalBlur->Use();
+    
+    // TODO: Have all this abstracted
+    // 
+    // Input image
+    unsigned imageUnit = 0 ; // Perhaps 0 for input image and 1 for output image
+    unsigned loc = glGetUniformLocation(m_HorizontalBlur->GetID(), "src"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOLightDepth.m_GBuffers[0], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    // Output image
+    imageUnit = 1; // Perhaps 0 for input image and 1 for output image
+    loc = glGetUniformLocation(m_HorizontalBlur->GetID(), "dst"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOLightDepthBlurred.m_GBuffers[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+    // Change GL_READ_ONLY to GL_WRITE_ONLY for output image
+    // Note: GL_RGBA32F means 4 channels (RGBA) of 32 bit floats.
+
+
+    int bindpoint = 0; // Start at zero, increment for other blocks
+    loc = glGetUniformBlockIndex(m_HorizontalBlur->GetID(), "blurKernel");
+    glUniformBlockBinding(m_HorizontalBlur->GetID(), loc, bindpoint);
+    glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
+    glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
+    glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
+
+    loc = glGetUniformLocation(m_HorizontalBlur->GetID(), "w");
+    glUniform1i(loc, m_KernelHalfWidth);
+
+    glDispatchCompute(1024/128, 1024, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_HorizontalBlur->Unuse();
+
+
+    // Vertical blur
+    m_VerticalBlur->Use();
+
+    // TODO: Have all this abstracted
+    // 
+    // Input image
+    imageUnit = 0; // 0 for input image
+    loc = glGetUniformLocation(m_VerticalBlur->GetID(), "src"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOLightDepthBlurred.m_GBuffers[0], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    // Output image
+    imageUnit = 1; // 1 for output image
+    loc = glGetUniformLocation(m_VerticalBlur->GetID(), "dst"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOLightDepthBlurred.m_GBuffers[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+    // Change GL_READ_ONLY to GL_WRITE_ONLY for output image
+    // Note: GL_RGBA32F means 4 channels (RGBA) of 32 bit floats.
+
+    bindpoint = 0; // Start at zero, increment for other blocks
+    loc = glGetUniformBlockIndex(m_VerticalBlur->GetID(), "blurKernel");
+    glUniformBlockBinding(m_VerticalBlur->GetID(), loc, bindpoint);
+    glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
+    glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
+    glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
+
+    loc = glGetUniformLocation(m_VerticalBlur->GetID(), "w");
+    glUniform1i(loc, m_KernelHalfWidth);
+
+    glDispatchCompute(1024, 1024/128, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_VerticalBlur->Unuse();
 
 
     // ---- DEFERRED SHADING ----
@@ -300,13 +408,15 @@ void Renderer::Draw(std::vector<Object*>& objects,
     m_DefShaderLighting->SetVec3("globalLight.position", m_GlobalLight.m_Position);
     m_DefShaderLighting->SetVec3("globalLight.color", m_GlobalLight.m_Color);
     m_DefShaderLighting->SetVec3("viewPos", m_ViewPos);
+    m_DefShaderLighting->SetFloat("minDepth", minDepth);
+    m_DefShaderLighting->SetFloat("maxDepth", maxDepth);
 
     // Shadow matrix
     glm::mat4 shadowMat = m_BMat * m_ShadowProj * m_ShadowView;
     m_DefShaderLighting->SetMat4("shadowMat", shadowMat);
 
     glActiveTexture(GL_TEXTURE4);
-    glBindTexture(GL_TEXTURE_2D, m_FBOLightDepth.m_GBuffers[0]);
+    glBindTexture(GL_TEXTURE_2D, m_FBOLightDepthBlurred.m_GBuffers[0]);
 
     m_QuadDefShadingOutput.BindVAO();
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -424,7 +534,6 @@ void Renderer::Deserialize(std::string path) {
     std::cout << "Configured";
     // Initialize all objects and their components.
     //p_ObjManager->Initialize();
-
 }
 
 nlohmann::json::value_type Renderer::Serialize()

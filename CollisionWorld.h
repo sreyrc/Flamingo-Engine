@@ -21,6 +21,8 @@ class CollisionWorld
 public:
 	CollisionWorld();
 
+	void AddCollider(Collider* col);
+
 	// Add objects which have colliders
 	void Configure(std::vector<Object*>& objects);
 
