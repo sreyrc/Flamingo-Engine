@@ -1,4 +1,4 @@
-#version 330 core
+﻿#version 330 core
 
 out vec4 FragColor;
 in vec2 TexCoords;
@@ -27,6 +27,8 @@ uniform mat4 shadowMat;
 uniform Light globalLight;
 
 uniform float width, height;
+
+uniform float minDepth, maxDepth;
 
 uniform vec3 viewPos;
 
@@ -72,6 +74,31 @@ vec3 fresnelSchlick(float cosTheta, vec3 F0)
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
+vec3 Cholesky (mat3 m, float z1, float z2 , float z3) {
+    float a = sqrt(m[0][0]);
+    if (a <= 0) a = 0.0001f;
+
+    float b = m[0][1] / a;
+    float c = m[0][2] / a;
+    float d = sqrt(m[1][1] - (b * b));
+    if (d <= 0) d = 0.0001f;
+    
+    float e = (m[1][2] - (b * c)) / d;
+    
+    float f = sqrt(m[2][2] - (c * c) - (e * e));
+    if (f <= 0) f = 0.0001f;
+
+    float cHat1 = z1 / a;
+    float cHat2 = (z2 - (b * cHat1)) / d;
+    float cHat3 = (z3 - (c * cHat1) - (e * cHat2)) / f;
+    
+    float c3 = cHat3 / f;
+    float c2 = (cHat2 - (e * c3)) / d;
+    float c1 = (cHat1 - (b * c2) - (c * c3)) / d;
+
+    return vec3(c1, c2, c3);
+}
+
 void main()
 {		
     vec2 uv = gl_FragCoord.xy / vec2(width, height);
@@ -114,20 +141,89 @@ void main()
             
     float NdotL = max(dot(N, L), 0.0);                
     Lo += (kD * albedo / PI + specular) * radiance * NdotL; 
+    //Lo += (kD * albedo / PI) * radiance * NdotL; 
+    //Lo += specular * radiance * NdotL; 
 
     vec3 ambient = vec3(0.03) * albedo;
-    float shadow = 0.0f;
 
     vec4 shadowCoord = shadowMat * vec4(FragPos, 1.0f);
-    vec2 shadowIndex = shadowCoord.xy/shadowCoord.w;
+    vec2 shadowIndex = shadowCoord.xy / shadowCoord.w;
 
-    float bias = 0.005f;
-    float lightDepth = texture(shadowMap, shadowIndex).w;
-    float pixelDepth = shadowCoord.w;
-    if (pixelDepth - bias > lightDepth) { shadow = 1.0f; }
+    float amtLit = 1.0f;
+    float shadow = 0.0f;
 
-    vec3 color = ambient + (Lo * (1 - shadow));
-	
+    float relativePixelDepth;
+
+    if (shadowCoord.w > 0 &&
+    shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
+    shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
+
+         relativePixelDepth = (shadowCoord.w - minDepth) / (maxDepth - minDepth);
+         vec4 moments = texture(shadowMap, shadowIndex);
+         float relativeLightDepth = moments[0];
+
+        if (relativePixelDepth > relativeLightDepth) {
+            //shadow = 1.0f;
+            float mean = moments[0];
+            float variance = moments[1] - (mean * mean);
+
+            float diff = relativePixelDepth - mean;
+            amtLit = variance / (variance + (diff * diff));
+        }
+    }
+
+    amtLit = clamp(amtLit, 0, 1);
+    //4-msm
+
+//    if (shadowCoord.w > 0 &&
+//    shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
+//    shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
+//
+//        float zf = shadowCoord.w; // frag depth
+//        float alpha = 0.002f; 
+//        vec4 b = texture(shadowMap, shadowIndex);
+//
+//        b = ((1 - alpha) * b) + (alpha * vec4(0.5, 0.5, 0.5, 0.5));
+//    
+//        vec3 column0 = vec3(1.0, b[0], b[1]);
+//        vec3 column1 = vec3(b[0], b[1], b[2]);
+//        vec3 column2 = vec3(b[1], b[2], b[3]);
+//        mat3 m = mat3(column0, column1, column2); 
+//
+//        // (c1, c2, c3)
+//        // or (c, b, a)
+//        vec3 c = Cholesky(m, 1, zf, zf * zf);
+//
+//        // discr. = b^2 - 4ac
+//        float discriminant = (c[1] * c[1]) - (4 * c[2] * c[0]);
+//        float z2 = (-c[1] - sqrt(discriminant)) / (2 * c[2]);
+//        float z3 = 0.0f;
+//
+//        if (c[2] < 0.0f) {
+//            z3 = z2;
+//            z2 = (-c[1] + sqrt(discriminant)) / (2 * c[2]);
+//        }
+//        else { z3 = (-c[1] + sqrt(discriminant)) / (2 * c[2]); }
+//
+//        if (zf <= z2) shadow = 0.0f;
+//        else if (zf <= z3) { 
+//            shadow = ((zf * z3) - (b[0] * (zf + z3)) + b[1]) / ((z3 - z2) * (zf - z2));
+//        }
+//        else {
+//            shadow = 1 - ( ((z2 * z3) - (b[0] * (z2 + z3)) + b[1]) / ((zf - z2) * (zf - z3)) );
+//        }
+//    }
+
+
+//    float outlineFactor = dot(V, N);
+//
+//    if(outlineFactor > 0.3f) { outlineFactor = 1.0f; }
+//    else { outlineFactor = 0.0f; }
+
+    //vec3 color = ambient + (Lo * (1 - shadow));	
+    //vec3 color = vec3(relativePixelDepth);
+    vec3 color = ambient + (Lo * amtLit);	
+    //vec3 color = ambient + Lo;	
     color = color / (color + vec3(1.0));
     color = pow(color, vec3(1.0/2.2));  
    

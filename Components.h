@@ -6,6 +6,8 @@
 #include "AABB.h"
 #include "OBB.h"
 
+#include <glm/gtx/quaternion.hpp>
+
 #include <nlohmann/json.hpp>
 
 class Object;
@@ -38,7 +40,8 @@ class Transform : public Component {
 public:
 	//Transform() {};
 	Transform() : m_Position(0.0f),
-		m_Rotation(0.0f),
+		m_Rotation(1.0f, 0.0f, 0.0f, 0.0f),
+		m_RotationEuler(0.0f),
 		m_Scale(1.0f),
 		m_WorldTransform(1.0f) {};
 
@@ -58,15 +61,24 @@ public:
 		m_Scale = glm::vec3(jsonObj["Scale"][0],
 			jsonObj["Scale"][1], jsonObj["Scale"][2]);
 
-		m_Rotation = glm::vec3(jsonObj["Rotation"][0],
+		m_RotationEuler = glm::vec3(jsonObj["Rotation"][0],
 			jsonObj["Rotation"][1], jsonObj["Rotation"][2]);
+
+		m_RotationEulerRad = glm::vec3(
+			glm::radians(m_RotationEuler.x),
+			glm::radians(m_RotationEuler.y),
+			glm::radians(m_RotationEuler.z)
+		);
+
+		m_Rotation = glm::quat(m_RotationEulerRad);
 
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_Position);
 		glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), m_Scale);
-		glm::mat4 rotateMat(1.0f);
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.x), glm::vec3(1, 0, 0));
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
+		glm::mat4 rotateMat = glm::toMat4(m_Rotation);
+		//(1.0f);
+		//rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
+		//rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.x), glm::vec3(1, 0, 0));
+		//rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
 		m_WorldTransform = translationMat * rotateMat * scaleMat;
 	};
 
@@ -89,26 +101,21 @@ public:
 		glm::mat4 translationMat = glm::translate(glm::mat4(1.0f), m_Position);
 		glm::mat4 scaleMat = glm::scale(glm::mat4(1.0f), m_Scale);
 		glm::mat4 rotateMat(1.0f);// = glm::rotate(glm::mat4(1.0f),
-		//	glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
-		////glm::mat4 rotateMat = glm::mat4_cast(m_Rotation);
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.y), glm::vec3(0, 1, 0));
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.x), glm::vec3(1, 0, 0));
-		rotateMat = glm::rotate(rotateMat, glm::radians(m_Rotation.z), glm::vec3(0, 0, 1));
+		m_RotationEulerRad = glm::vec3(
+			glm::radians(m_RotationEuler.x),
+			glm::radians(m_RotationEuler.y),
+			glm::radians(m_RotationEuler.z)
+		);
+		m_Rotation = glm::quat(m_RotationEulerRad);
+		rotateMat = glm::toMat4(m_Rotation);
 		m_WorldTransform = translationMat * rotateMat * scaleMat;
 	}
 
-	//inline glm::vec3& GetPosition() { return m_Position; }
-	//inline glm::quat& GetRotation() { return m_Rotation; }
-	//inline glm::vec3& GetScale() { return m_Scale; }
-
 	inline glm::mat4 GetWorldTransform() { return m_WorldTransform; }
 
-	//inline void SetPosition(glm::vec3 pos) { m_Position = pos; }
-	//inline void SetRotation(glm::quat rot) { m_Rotation = rot; }
-	//inline void SetScale(glm::vec3 scale) { m_Scale = scale; }
-
 	glm::vec3 m_Position, m_Scale;
-	glm::vec3 m_Rotation;
+	glm::quat m_Rotation;
+	glm::vec3 m_RotationEuler, m_RotationEulerRad;
 	glm::mat4 m_WorldTransform;
 };
 
@@ -148,11 +155,11 @@ public:
 
 		// TODO: This yucky "if" - approach isn't scalable. 
 		// Replace with an alternative eventually
-		if (jsonObj["BV_Level_1"] == "AABB") { m_BVLevel1 = new AABB(); }
-		if (jsonObj["BV_Level_1"] == "OBB") { m_BVLevel1 = new OBB(); }
+		if (jsonObj["BV_Level_1"] == "AABB") { m_BVLevel1 = new AABB(); m_BVLevel1Type = BVType::AABB; }
+		if (jsonObj["BV_Level_1"] == "OBB") { m_BVLevel1 = new OBB(); m_BVLevel1Type = BVType::OBB; } 
 
-		if (jsonObj["BV_Level_2"] == "AABB") { m_BVLevel2 = new AABB(); }
-		if (jsonObj["BV_Level_2"] == "OBB") { m_BVLevel2 = new OBB(); }
+		if (jsonObj["BV_Level_2"] == "AABB") { m_BVLevel2 = new AABB(); m_BVLevel2Type = BVType::AABB; }
+		if (jsonObj["BV_Level_2"] == "OBB") { m_BVLevel2 = new OBB(); m_BVLevel2Type = BVType::OBB; }
 
 		m_BVLevel1->SetParentCollider(this);
 		m_BVLevel2->SetParentCollider(this);

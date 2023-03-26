@@ -53,43 +53,89 @@ void Editor::Update(
     }
     ImGui::End();
 
+    //// Scene lights
+    //ImGui::Begin("Lights");
+    //ImGui::End();
 
-    ImGui::Begin("Shadow depth buffer"); {
-        ImGui::Image((ImTextureID)p_Renderer->m_FBOLightDepth.m_GBuffers[0],
-            ImVec2(384, 384), ImVec2(0, 1), ImVec2(1, 0));
-    }
-    ImGui::End();
+    // Object editor
+    ImGui::Begin("Scene Editor"); {
+        ImGui::Text("Scenes: ");
 
-    // Scene lights
-    ImGui::Begin("Lights"); {
+        if (ImGui::BeginListBox("##SceneList")) {
+            for (auto& sceneName : p_SceneManager->m_SceneNames) {
+                const bool is_selected =
+                    (p_SceneManager->m_SelectedScene == sceneName);
 
-        // Global light
-        ImGui::SliderFloat3("Global Light Position",
-            &p_Renderer->m_GlobalLight.m_Position.x, -50.0f, 50.0f);
-        ImGui::SliderFloat3("Global Light Color",
-            &p_Renderer->m_GlobalLight.m_Color.x, 0.0f, 500.0f);
+                if (ImGui::Selectable(sceneName.c_str(), is_selected)) {
+                    p_SceneManager->m_SelectedScene = sceneName;
+                }
 
-        // Local lights
-        int numLights = static_cast<int>(p_Renderer->m_LocalLights.size());
-        for (int i = 0; i < numLights; i++) {
-
-            std::string lightNumText = "Light " + std::to_string(i);
-            ImGui::Text(lightNumText.c_str());
-            std::string posLabel = "Position ##" + lightNumText;
-            std::string colorLabel = "Color ##" + lightNumText;
-            std::string rangeLabel = "Range ##" + lightNumText;
-            ImGui::SliderFloat3(posLabel.c_str(),
-                &p_Renderer->m_LocalLights[i].m_Position.x, -50.0f, 50.0f);
-            ImGui::SliderFloat3(colorLabel.c_str(),
-                &p_Renderer->m_LocalLights[i].m_Color.x, 0.0f, 200.0f);
-            ImGui::SliderFloat(rangeLabel.c_str(),
-                &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 200.0f);
-
-            ImGui::Dummy(ImVec2(20, 20));
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndListBox();
         }
 
-        // TODO: This might be temporary
+        if (ImGui::Button("Load Scene")) {
+            p_SceneManager->LoadScene(p_SceneManager->m_SelectedScene,
+                p_ObjectManager, p_ObjectFactory,
+                p_ResourceManager, p_CollisionWorld, p_Renderer);
+        }
 
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(20, 20));
+
+        // Shadow settings
+        ImGui::Text("Shadows:");
+        ImGui::SliderInt("Kernel Half-Width", &p_Renderer->m_KernelHalfWidth, 0, 50);
+        ImGui::DragFloat("Center Half-Radius", &p_Renderer->m_CenterRadius, 5, 20);
+
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(20, 20));
+
+        // Lights
+        ImGui::Text("Lights:");
+        ImGui::Dummy(ImVec2(20, 20));
+
+        // Global light
+        ImGui::DragFloat3("Global Light Position",
+            &p_Renderer->m_GlobalLight.m_Position.x);
+        ImGui::DragFloat3("Global Light Color",
+            &p_Renderer->m_GlobalLight.m_Color.x);
+
+        ImGui::Dummy(ImVec2(20, 20));
+
+        ImGui::Text("Local Lights:");
+        if (ImGui::BeginTabBar("#LightTabs")) {
+            // Local lights
+            int numLights = static_cast<int>(p_Renderer->m_LocalLights.size());
+            for (int i = 0; i < numLights; i++) {
+
+                std::string lightNumText = "Light " + std::to_string(i);
+
+                if (ImGui::BeginTabItem(lightNumText.c_str())) {
+                    std::string lightNumText = "Light " + std::to_string(i);
+                    ImGui::Text(lightNumText.c_str());
+                    std::string posLabel = "Position ##" + lightNumText;
+                    std::string colorLabel = "Color ##" + lightNumText;
+                    std::string rangeLabel = "Range ##" + lightNumText;
+                    ImGui::DragFloat3(posLabel.c_str(),
+                        &p_Renderer->m_LocalLights[i].m_Position.x);
+                    ImGui::DragFloat3(colorLabel.c_str(),
+                        &p_Renderer->m_LocalLights[i].m_Color.x);
+                    ImGui::DragFloat(rangeLabel.c_str(),
+                        &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 200.0f);
+
+                    ImGui::EndTabItem();
+                }
+            }
+            ImGui::EndTabBar();
+        }
+
+        
+        // TODO: This might be temporary
         if (ImGui::Button("Add a LOT of lights")) {
 
             unsigned seedColor = std::chrono::steady_clock::now().time_since_epoch().count();
@@ -106,44 +152,19 @@ void Editor::Update(
                     pos = glm::vec3(i, 3.0f, j);
                     // TODO: Assign random values here
                     range = 7.0f;
-                    color = glm::vec3(20 + (eColor() % 50), 
+                    color = glm::vec3(20 + (eColor() % 50),
                         20 + (eColor() % 50), 20 + (eColor() % 50));
                     //range = 2;
                     p_Renderer->AddLight(pos, color, range);
                 }
             }
         }
-    }
-    ImGui::End();
+        
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(20, 20));
 
-    // Scene list. Select a scene and load selected if desired
-    ImGui::Begin("Saved Scenes"); {
-        if (ImGui::BeginListBox("##SceneList")); {
-            for (auto& sceneName : p_SceneManager->m_SceneNames) {
-                const bool is_selected = 
-                    (p_SceneManager->m_SelectedScene == sceneName);
-
-                if (ImGui::Selectable(sceneName.c_str(), is_selected)) {
-                    p_SceneManager->m_SelectedScene = sceneName;
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndListBox();
-
-        if (ImGui::Button("Load Scene")) {
-            p_SceneManager->LoadScene(p_SceneManager->m_SelectedScene,
-                p_ObjectManager, p_ObjectFactory, 
-                p_ResourceManager, p_CollisionWorld, p_Renderer);
-        }
-    }
-    ImGui::End();
-
-
-    // Object editor
-    ImGui::Begin("Objects"); {
+        ImGui::Text("Objects:");
 
         auto& objects = p_ObjectManager->m_ObjectList;
         
@@ -168,9 +189,9 @@ void Editor::Update(
                     ImGui::Text("Transform: ");
                     Transform* tr = objects[i]->GetComponent<Transform*>();
                     if (tr) {
-                        ImGui::SliderFloat3("Position", &tr->m_Position.x, -10.0f, 10.0f);
-                        ImGui::SliderFloat3("Scale", &tr->m_Scale.x, 0.1f, 2.0f);
-                        ImGui::SliderFloat3("Rotation", &tr->m_Rotation.x, -90.0f, 90.0f);
+                        ImGui::DragFloat3("Position", &tr->m_Position.x, -10.0f, 10.0f);
+                        ImGui::DragFloat3("Scale", &tr->m_Scale.x, 0.1f, 2.0f);
+                        ImGui::SliderFloat3("Rotation", &tr->m_RotationEuler.x, -180.0f, 180.0f);
                     }
 
                     ImGui::Dummy(ImVec2(20, 20));
@@ -179,7 +200,7 @@ void Editor::Update(
                     ImGui::Text("Model: ");
                     ModelComp* md = objects[i]->GetComponent<ModelComp*>();
                     if (md) {
-                        if (ImGui::BeginListBox("##ModelList")); {
+                        if (ImGui::BeginListBox("##ModelList")) {
                             for (auto& modelName : p_ResourceManager->m_ModelNames) {
                                 const bool is_selected =
                                     (md->m_ModelSelected == modelName);
@@ -200,7 +221,6 @@ void Editor::Update(
                             if (col) col->Initialize();
                         }
 
-                        // TODO: m_UseTextures should be in the model comp. Change this ASAP
                         ImGui::Checkbox("Use textures", 
                             &md->GetModel()->m_UseTextures);
                     }
@@ -220,78 +240,78 @@ void Editor::Update(
             }
             ImGui::EndTabBar();
         }
-    }
-    ImGui::Dummy(ImVec2(50, 50));
+        ImGui::Dummy(ImVec2(50, 50));
 
-    if (ImGui::Button("Add New Object")) {
-        p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
-    }
+        if (ImGui::Button("Add New Object")) {
+            p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager, p_CollisionWorld);
+        }
 
-    // TODO: Super hacky and most probably temporary - refactor later or just remove
-    if (ImGui::Button("Add a LOT of Objects")) {
+        // TODO: Super hacky and most probably temporary - refactor later or just remove
+        if (ImGui::Button("Add a LOT of Objects")) {
 
-        // For material properties. any value between 0 and 1 for both hence same 
-        // rangome engine can be used for both
-        unsigned seeObjProp = std::chrono::steady_clock::now().time_since_epoch().count();
-        std::default_random_engine eObjProp(seeObjProp);
+            // For material properties. any value between 0 and 1 for both hence same 
+            // rangome engine can be used for both
+            unsigned seeObjProp = std::chrono::steady_clock::now().time_since_epoch().count();
+            std::default_random_engine eObjProp(seeObjProp);
 
-        int obj_num = 0;
-        for (int i = -40; i < 40; i += 16) {
-            for (int j = -40; j < 40; j += 16) {
+            int obj_num = 0;
+            for (int i = -40; i < 40; i += 16) {
+                for (int j = -40; j < 40; j += 16) {
 
-                Object* object = new Object("Newobj" + std::to_string(obj_num++));
-                // Create all components and add in the beginning
-                Transform* tr = new Transform();
-                ModelComp* md = new ModelComp();
-                Material* mat = new Material();
+                    Object* object = new Object("Newobj" + std::to_string(obj_num++));
+                    // Create all components and add in the beginning
+                    Transform* tr = new Transform();
+                    ModelComp* md = new ModelComp();
+                    Material* mat = new Material();
 
-                // Set random mat properties
-                mat->m_Albedo = glm::vec3(
-                    eObjProp() / static_cast<float>(eObjProp.max()),
-                    eObjProp() / static_cast<float>(eObjProp.max()),
-                    eObjProp() / static_cast<float>(eObjProp.max()));
-                mat->m_Metalness = eObjProp() / static_cast<float>(eObjProp.max());
-                mat->m_Roughness = eObjProp() / static_cast<float>(eObjProp.max());
-                
-                md->SetDefaults(p_ResourceManager);
-                //mat->SetDefaults(p_ResourceManager);
-                
-                tr->m_Position = glm::vec3(i, 0, j);
-                tr->m_Scale = glm::vec3(1 + 
-                    (eObjProp() / static_cast<float>(eObjProp.max())));
+                    // Set random mat properties
+                    mat->m_Albedo = glm::vec3(
+                        eObjProp() / static_cast<float>(eObjProp.max()),
+                        eObjProp() / static_cast<float>(eObjProp.max()),
+                        eObjProp() / static_cast<float>(eObjProp.max()));
+                    mat->m_Metalness = eObjProp() / static_cast<float>(eObjProp.max());
+                    mat->m_Roughness = eObjProp() / static_cast<float>(eObjProp.max());
 
-                // Add all the components
-                object->AddComponent(tr);
-                object->AddComponent(md);
-                object->AddComponent(mat);
+                    md->SetDefaults(p_ResourceManager);
+                    //mat->SetDefaults(p_ResourceManager);
 
-                object->Initialize();
-                p_ObjectManager->AddObject(object);
+                    tr->m_Position = glm::vec3(i, 0, j);
+                    tr->m_Scale = glm::vec3(1 +
+                        (eObjProp() / static_cast<float>(eObjProp.max())));
+
+                    // Add all the components
+                    object->AddComponent(tr);
+                    object->AddComponent(md);
+                    object->AddComponent(mat);
+
+                    object->Initialize();
+                    p_ObjectManager->AddObject(object);
+                }
+            }
+            //p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
+        }
+        ImGui::Dummy(ImVec2(50, 50));
+        ImGui::InputText("Scene name", p_SceneManager->m_SceneNameBuf,
+            sizeof(p_SceneManager->m_SceneNameBuf));
+
+        if (ImGui::Button("Save New Scene")) {
+            if (std::string(p_SceneManager->m_SceneNameBuf) != "") {
+                p_SceneManager->m_SceneName = p_SceneManager->m_SceneNameBuf;
+                p_SceneManager->SaveScene(p_SceneManager->m_SceneName,
+                    p_ObjectManager, p_Renderer);
+            }
+            else {
+                ImGui::Text("Please name your scene");
             }
         }
-        //p_ObjectFactory->CreateObject(p_ObjectManager, p_ResourceManager);
-    }
-    ImGui::Dummy(ImVec2(50, 50));
-    ImGui::InputText("Scene name", p_SceneManager->m_SceneNameBuf, 
-        sizeof(p_SceneManager->m_SceneNameBuf));
 
-    if (ImGui::Button("Save New Scene")) {
-        if (std::string(p_SceneManager->m_SceneNameBuf) != "") {
-            p_SceneManager->m_SceneName = p_SceneManager->m_SceneNameBuf;
-            p_SceneManager->SaveScene(p_SceneManager->m_SceneName, 
+        if (ImGui::Button("Overwrite Current Scene")) {
+            p_SceneManager->SaveScene(p_SceneManager->m_SelectedScene,
                 p_ObjectManager, p_Renderer);
         }
-        else {
-            ImGui::Text("Please name your scene");
-        }
+        ImGui::End();
     }
 
-    if (ImGui::Button("Overwrite Current Scene")) {
-        p_SceneManager->SaveScene(p_SceneManager->m_SelectedScene,
-            p_ObjectManager, p_Renderer);
-    }
-    
-    ImGui::End();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

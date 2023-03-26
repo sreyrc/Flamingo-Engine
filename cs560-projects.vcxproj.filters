@@ -96,6 +96,9 @@
     <ClCompile Include="OBB.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeShader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shader.h">
@@ -206,6 +209,9 @@
     <ClInclude Include="Texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ComputeShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="ModelShader.frag">
@@ -269,6 +275,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shadow.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="VerticalBlur.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="HorizontalBlur.comp">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

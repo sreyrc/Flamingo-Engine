@@ -226,6 +226,11 @@ CollisionWorld::CollisionWorld()
 	m_CollisionQueueLevel1.resize(NUM_MAX_COLLISIONS);
 }
 
+void CollisionWorld::AddCollider(Collider* col)
+{
+	m_Colliders.push_back(col);
+}
+
 void CollisionWorld::Configure(std::vector<Object*>& objects)
 {
 	m_Colliders.clear();
