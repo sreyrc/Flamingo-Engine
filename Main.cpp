@@ -141,7 +141,7 @@ int main() {
         p_CollisionWorld->Update();
 
         // Draw call
-        p_Renderer->Draw(p_ObjectManager->m_ObjectList, 
+        p_Renderer->Draw(p_ObjectManager->m_ObjectList, p_ResourceManager,
             SCREEN_WIDTH, SCREEN_HEIGHT);
 
         p_CollisionWorld->ClearCollisionQueues();

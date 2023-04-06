@@ -180,6 +180,7 @@
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SoftBody.cpp" />
     <ClCompile Include="stb_impl.cpp" />
+    <ClCompile Include="TextureHDR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABB.h" />
@@ -219,6 +220,7 @@
     <ClInclude Include="SoftBody.h" />
     <ClInclude Include="SphereMesh.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="TextureHDR.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="DefShaderMultLights.frag" />
@@ -239,8 +241,8 @@
     <None Include="Shadow.frag" />
     <None Include="Shadow.vert" />
     <None Include="HorizontalBlur.comp" />
-    <None Include="Skybox.frag" />
-    <None Include="Skybox.vert" />
+    <None Include="SkyDome.frag" />
+    <None Include="SkyDome.vert" />
     <None Include="SoftBody.frag" />
     <None Include="SoftBody.vert" />
     <None Include="VerticalBlur.comp" />

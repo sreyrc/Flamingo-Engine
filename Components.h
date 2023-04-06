@@ -132,6 +132,8 @@ public:
 	void SetDefaults(ResourceManager* p_ResourceManager) {
 		m_BVLevel1 = new AABB();
 		m_BVLevel2 = new OBB();
+		m_BVLevel1Type = BVType::AABB;
+		m_BVLevel2Type = BVType::OBB;
 		m_BVLevel1->SetParentCollider(this);
 		m_BVLevel2->SetParentCollider(this);
 	}

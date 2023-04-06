@@ -15,6 +15,11 @@
 #include "FBO.h"
 #include "QuadMesh.h"
 
+struct HammerseleyData {
+    float N;
+    std::vector<float> values;
+};
+
 struct Light {
     glm::vec3 m_Position;
     glm::vec3 m_Color;
@@ -31,7 +36,7 @@ class Renderer
 public:
 	Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT);
 
-	void Draw(std::vector<Object*>& objects, 
+	void Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceManager,
         int SCREEN_WIDTH, int SCREEN_HEIGHT);
     
     void Deserialize(std::string path);
@@ -40,6 +45,8 @@ public:
     void AddLight(glm::vec3 position, glm::vec3 color, float range) {
         m_LocalLights.push_back(Light(position, color, range));
     }
+
+    void HammersleyBlockSetup();
 
     float m_LineWidth;
 
@@ -67,7 +74,8 @@ public:
         *m_DefShaderGBufTex,
         *m_MultLocalLightsShader,
         *m_LineShader,
-        *m_ShadowShader;
+        *m_ShadowShader,
+        *m_SkyDomeShader;
 
     ComputeShader* m_HorizontalBlur, 
         *m_VerticalBlur;
@@ -82,7 +90,7 @@ public:
     glm::mat4 m_ShadowProj, m_ShadowView, m_BMat;
 
     // Mesh for sphere
-    SphereMesh m_SphereMesh;
+    SphereMesh m_SphereMesh, m_SkyDomeMesh;
 
     // G Buffer for Def. Shading
     FBO m_FBOForDefShading;
@@ -101,16 +109,28 @@ public:
 
     float m_CenterRadius = 10.0f;
 
+    float m_ExposureControl = 1.0f;
+
+    bool m_IBLon = false;
+
     unsigned int m_CubeMapTexID;
     unsigned int m_SkyBoxVAO;
     unsigned int m_SkyBoxVBO;
 
-    unsigned m_Block, m_Block1;
+    unsigned m_Block, m_Block1, m_HammersleyBlock;
+
+    unsigned m_HammerseleyBindPoint;
+
+    HammerseleyData m_HammersleyData;
+
+    HDRTextureSet* m_HDRTexSet;
 
     // TODO: Remove this stuff
     bool m_DrawSprings = true;
     bool m_DrawSkin = false;
     bool m_DrawMassPoints = true;
+
+    bool m_DebugCollidersOn = true;
 
 private:
     //void SetLightingVars(Shader* shader);

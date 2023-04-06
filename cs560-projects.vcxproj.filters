@@ -99,6 +99,9 @@
     <ClCompile Include="ComputeShader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="TextureHDR.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Shader.h">
@@ -212,6 +215,9 @@
     <ClInclude Include="ComputeShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="TextureHDR.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="ModelShader.frag">
@@ -230,12 +236,6 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="SoftBody.frag">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Skybox.vert">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Skybox.frag">
       <Filter>Shaders</Filter>
     </None>
     <None Include="ModelShaderPBR.frag">
@@ -281,6 +281,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="HorizontalBlur.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="SkyDome.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="SkyDome.vert">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

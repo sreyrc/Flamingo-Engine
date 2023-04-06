@@ -25,11 +25,14 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderLighting = new Shader("DefShaderLightingPass.vert", "DefShaderLightingPass.frag");
     m_LineShader = new Shader("LineShader.vert", "LineShader.frag"); 
     m_MultLocalLightsShader = new Shader("MultLocalLightsShader.vert", "MultLocalLightsShader.frag");
-    //m_SkyBoxShader = new Shader("Skybox.vert", "Skybox.frag");
     m_ShadowShader = new Shader("Shadow.vert", "Shadow.frag");
+    m_SkyDomeShader = new Shader("SkyDome.vert", "SkyDome.frag");
     
     m_HorizontalBlur = new ComputeShader("HorizontalBlur.comp");
     m_VerticalBlur = new ComputeShader("VerticalBlur.comp");
+
+    m_DefShaderGBuffer->Use();
+    m_DefShaderGBuffer->SetInt("skyBoxTexture", 0);
 
     // Set samplers for textures which will be used to fill in G-Buffer
     m_DefShaderGBufTex->Use();
@@ -46,6 +49,8 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderLighting->SetInt("g_Diffuse", 2);
     m_DefShaderLighting->SetInt("g_RoughMetal", 3);
     m_DefShaderLighting->SetInt("shadowMap", 4);
+    m_DefShaderLighting->SetInt("irradianceMap", 5);
+    m_DefShaderLighting->SetInt("skyDomeMap", 6);
     m_DefShaderLighting->SetFloat("width", (float)SCREEN_WIDTH);
     m_DefShaderLighting->SetFloat("height", (float)SCREEN_HEIGHT);
     m_DefShaderLighting->Unuse();
@@ -70,8 +75,8 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_ShadowShader->SetMat4("proj", m_ShadowProj);
     m_ShadowShader->Unuse();
 
-    //m_SkyBoxShader->Use();
-    //m_SkyBoxShader->SetInt("skybox", 0);
+    m_SkyDomeShader->Use();
+    m_SkyDomeShader->SetInt("tex", 0);
 
     // Set up camera
     m_Camera = cam;
@@ -97,86 +102,19 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     // For storing depth values. Needed for shadow-mapping
     m_FBOLightDepthBlurred.CreateFBO(1024, 1024, 1);
 
-    SphereMesh sphereMesh;
-    m_SphereMesh = sphereMesh;
-
     glGenBuffers(1, &m_Block); // Generates block
     glGenBuffers(1, &m_Block1); // Generates block
 
-    //float skyboxVertices[] = {
-    //    // positions          
-    //    -1.0f,  1.0f, -1.0f,
-    //    -1.0f, -1.0f, -1.0f,
-    //     1.0f, -1.0f, -1.0f,
-    //     1.0f, -1.0f, -1.0f,
-    //     1.0f,  1.0f, -1.0f,
-    //    -1.0f,  1.0f, -1.0f,
-
-    //    -1.0f, -1.0f,  1.0f,
-    //    -1.0f, -1.0f, -1.0f,
-    //    -1.0f,  1.0f, -1.0f,
-    //    -1.0f,  1.0f, -1.0f,
-    //    -1.0f,  1.0f,  1.0f,
-    //    -1.0f, -1.0f,  1.0f,
-
-    //     1.0f, -1.0f, -1.0f,
-    //     1.0f, -1.0f,  1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //     1.0f,  1.0f, -1.0f,
-    //     1.0f, -1.0f, -1.0f,
-
-    //    -1.0f, -1.0f,  1.0f,
-    //    -1.0f,  1.0f,  1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //     1.0f, -1.0f,  1.0f,
-    //    -1.0f, -1.0f,  1.0f,
-
-    //    -1.0f,  1.0f, -1.0f,
-    //     1.0f,  1.0f, -1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //     1.0f,  1.0f,  1.0f,
-    //    -1.0f,  1.0f,  1.0f,
-    //    -1.0f,  1.0f, -1.0f,
-
-    //    -1.0f, -1.0f, -1.0f,
-    //    -1.0f, -1.0f,  1.0f,
-    //     1.0f, -1.0f, -1.0f,
-    //     1.0f, -1.0f, -1.0f,
-    //    -1.0f, -1.0f,  1.0f,
-    //     1.0f, -1.0f,  1.0f
-    //};
-    //// first, configure the cube's VAO (and VBO)
-    //glGenVertexArrays(1, &m_SkyBoxVAO);
-    //glGenBuffers(1, &m_SkyBoxVBO);
-
-    //glBindBuffer(GL_ARRAY_BUFFER, m_SkyBoxVBO);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), skyboxVertices, GL_STATIC_DRAW);
-
-    //glBindVertexArray(m_SkyBoxVAO);
-
-    //// position attribute
-    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    //glEnableVertexAttribArray(0);
-
-    //std::vector<std::string> faces
-    //{
-    //    "../skybox/right.jpg",
-    //    "../skybox/left.jpg",
-    //    "../skybox/top.jpg",
-    //    "../skybox/bottom.jpg",
-    //    "../skybox/front.jpg",
-    //    "../skybox/back.jpg"
-    //};
-    //m_CubeMapTexID = LoadCubemap(faces);
+    HammersleyBlockSetup();
 }
 
 
-// Draw skeleton and model if opted for
-void Renderer::Draw(std::vector<Object*>& objects, 
+// Draw the scene
+void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceManager,
     int SCREEN_WIDTH, int SCREEN_HEIGHT)
 {
+
+    // Set up transforms
     m_ProjMat = glm::perspective(glm::radians(m_Camera->m_Zoom),
         (float)SCREEN_WIDTH / (float)SCREEN_HEIGHT, 0.1f, 1000.0f);
 
@@ -186,33 +124,9 @@ void Renderer::Draw(std::vector<Object*>& objects,
     m_ShadowView = glm::lookAt(m_GlobalLight.m_Position,
         glm::vec3(1), glm::vec3(0, 1, 0));
 
+    //glDisable(GL_DEPTH_TEST);    
     glEnable(GL_DEPTH_TEST);
- 
-    // Set BG color and clear buffers
-    //glClearColor(m_BgColor.x, m_BgColor.y, m_BgColor.z, 1.0f);
-    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    //glDepthFunc(GL_LEQUAL);  // change depth function so depth test passes when values are equal to depth buffer's content
-    //m_SkyBoxShader->Use()
-
-    //glm::mat4 view = glm::mat4(glm::mat3(m_ViewMat));
-    //m_SkyBoxShader->SetMat4("view", view);
-    //m_SkyBoxShader->SetMat4("proj", m_ProjMat);
-
-    //// Skybox cube
-    //glBindVertexArray(m_SkyBoxVAO);
-    //glActiveTexture(GL_TEXTURE0);
-    //glBindTexture(GL_TEXTURE_CUBE_MAP, m_CubeMapTexID);
-    //glDrawArrays(GL_TRIANGLES, 0, 36);
-    //glBindVertexArray(0);
-    //glDepthFunc(GL_LESS);
-
-    //SetupMatrices(glm::vec3(0, 0, 0));
-    //m_SphereMesh->BindVAO();
-    //glDrawElements(GL_TRIANGLE_STRIP,
-    //    m_SphereMesh->GetIndexCount(), GL_UNSIGNED_INT, 0);
-
+    
     
     // ---- SHADOW PASS ----
     //
@@ -285,7 +199,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
     // Note: GL_RGBA32F means 4 channels (RGBA) of 32 bit floats.
 
 
-    int bindpoint = 0; // Start at zero, increment for other blocks
+    unsigned bindpoint = 0; // Start at zero, increment for other blocks
     loc = glGetUniformBlockIndex(m_HorizontalBlur->GetID(), "blurKernel");
     glUniformBlockBinding(m_HorizontalBlur->GetID(), loc, bindpoint);
     glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
@@ -347,7 +261,6 @@ void Renderer::Draw(std::vector<Object*>& objects,
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-
     // Load data of all objects into the G-Buffers
     for (auto obj : objects) {
 
@@ -375,6 +288,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
             m_DefShaderGBuffer->SetMat4("view", m_ViewMat);
             m_DefShaderGBuffer->SetMat4("model",
                 obj->GetComponent<Transform*>()->GetWorldTransform());
+            m_DefShaderGBuffer->SetInt("isSkyDome", false);
 
             // Set material properties
             auto material = obj->GetComponent<Material*>();
@@ -386,6 +300,34 @@ void Renderer::Draw(std::vector<Object*>& objects,
             // Draw the model with this shader
             obj->GetComponent<ModelComp*>()->Draw(*m_DefShaderGBuffer);
         }
+    }
+
+    // Skydome - Onlyif IBL is on
+
+    // TODO: Make this a member var
+    if (m_IBLon) {
+
+        m_HDRTexSet = p_ResourceManager->GetHDRTextureSet("Newport_Loft_Ref");
+
+        m_DefShaderGBuffer->Use();
+
+        glm::mat4 skyModelTr = glm::mat4(1.0f);
+        skyModelTr = glm::scale(skyModelTr, glm::vec3(100, 100, 100));
+        //skyModelTr = glm::rotate(skyModelTr, glm::radians(90.0f), glm::vec3(1, 0, 0));
+        m_DefShaderGBuffer->SetMat4("model", skyModelTr);
+        glm::mat4 skyView = glm::mat4(glm::mat3(m_ViewMat));
+        m_DefShaderGBuffer->SetMat4("view", skyView);
+        m_DefShaderGBuffer->SetMat4("proj", m_ProjMat);
+        m_DefShaderGBuffer->SetFloat("expControl", m_ExposureControl);
+        m_DefShaderGBuffer->SetInt("isSkyDome", true);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_HDRTexSet->m_SkyTexture->GetID());
+
+        m_SkyDomeMesh.BindVAO();
+        m_SkyDomeMesh.Draw();
+
+        m_DefShaderGBuffer->Unuse();
     }
 
     // PASS 2 - LIGHTING PASS
@@ -410,6 +352,7 @@ void Renderer::Draw(std::vector<Object*>& objects,
     m_DefShaderLighting->SetVec3("viewPos", m_ViewPos);
     m_DefShaderLighting->SetFloat("minDepth", minDepth);
     m_DefShaderLighting->SetFloat("maxDepth", maxDepth);
+    m_DefShaderLighting->SetInt("iblOn", m_IBLon);
 
     // Shadow matrix
     glm::mat4 shadowMat = m_BMat * m_ShadowProj * m_ShadowView;
@@ -417,6 +360,27 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, m_FBOLightDepthBlurred.m_GBuffers[0]);
+
+    if (m_IBLon) {
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, m_HDRTexSet->m_IrradianceMap->GetID());
+
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, m_HDRTexSet->m_SkyTexture->GetID());
+
+        bindpoint = 1;
+        glBindBuffer(GL_UNIFORM_BUFFER, m_HammersleyBlock);
+        glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_HammersleyBlock);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof(float) + sizeof(float) * 
+            m_HammersleyData.values.size(), &m_HammersleyData, GL_STATIC_DRAW);
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(float), sizeof(float) * m_HammersleyData.values.size(),
+            &(m_HammersleyData.values[0]));
+
+        int loc = glGetUniformBlockIndex(m_DefShaderLighting->GetID(), "HammersleyBlock");
+        glUniformBlockBinding(m_DefShaderLighting->GetID(), loc, bindpoint);
+
+        m_DefShaderLighting->SetFloat("expControl", m_ExposureControl);
+    }
 
     m_QuadDefShadingOutput.BindVAO();
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -426,40 +390,40 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
+    //glEnable(GL_CULL_FACE);
+    //glDisable(GL_DEPTH_TEST);
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE);
+    //glEnable(GL_BLEND);
+    //glBlendFunc(GL_ONE, GL_ONE);
 
-    m_MultLocalLightsShader->Use();
-    m_MultLocalLightsShader->SetVec3("viewPos", m_ViewPos);
-    m_MultLocalLightsShader->SetMat4("view", m_ViewMat);
-    m_MultLocalLightsShader->SetMat4("proj", m_ProjMat);
+    //m_MultLocalLightsShader->Use();
+    //m_MultLocalLightsShader->SetVec3("viewPos", m_ViewPos);
+    //m_MultLocalLightsShader->SetMat4("view", m_ViewMat);
+    //m_MultLocalLightsShader->SetMat4("proj", m_ProjMat);
 
-    // Bind all G-Buffer textures
-    for (int i = 0; i < 4; i++) {
-        glActiveTexture(GL_TEXTURE0 + i);
-        glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[i]);
-    }
+    //// Bind all G-Buffer textures
+    //for (int i = 0; i < 4; i++) {
+    //    glActiveTexture(GL_TEXTURE0 + i);
+    //    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[i]);
+    //}
 
-    for (const auto& localLight : m_LocalLights) {
-        m_MultLocalLightsShader->SetVec3("localLight.position", localLight.m_Position);
-        m_MultLocalLightsShader->SetVec3("localLight.color", localLight.m_Color);
-        m_MultLocalLightsShader->SetFloat("localLight.r", localLight.m_Range);
+    //for (const auto& localLight : m_LocalLights) {
+    //    m_MultLocalLightsShader->SetVec3("localLight.position", localLight.m_Position);
+    //    m_MultLocalLightsShader->SetVec3("localLight.color", localLight.m_Color);
+    //    m_MultLocalLightsShader->SetFloat("localLight.r", localLight.m_Range);
 
-        // Create transformation for this light sphere
-        m_ModelMat = glm::translate(glm::mat4(1.0f), localLight.m_Position);
-        m_ModelMat = glm::scale(m_ModelMat, glm::vec3(localLight.m_Range, 
-            localLight.m_Range, localLight.m_Range));
-        m_MultLocalLightsShader->SetMat4("model", m_ModelMat);
+    //    // Create transformation for this light sphere
+    //    m_ModelMat = glm::translate(glm::mat4(1.0f), localLight.m_Position);
+    //    m_ModelMat = glm::scale(m_ModelMat, glm::vec3(localLight.m_Range, 
+    //        localLight.m_Range, localLight.m_Range));
+    //    m_MultLocalLightsShader->SetMat4("model", m_ModelMat);
 
-        m_SphereMesh.Draw();
-    }
+    //    m_SphereMesh.Draw();
+    //}
 
-    // Remember to disable blending before rendering next frame
-    glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
+    //// Remember to disable blending before rendering next frame
+    //glDisable(GL_BLEND);
+    //glDisable(GL_CULL_FACE);
 
     // ------- FORWARD SHADING -------
     //// Draw the models
@@ -492,10 +456,12 @@ void Renderer::Draw(std::vector<Object*>& objects,
 
     SetupLineShaderVars();
 
-    // TODO: Enable colliders later
-    for (auto obj : objects) {
-        auto col = obj->GetComponent<Collider*>();
-        if (col) col->Draw(m_LineShader);
+    // Enable colliders later
+    if (m_DebugCollidersOn) {
+        for (auto obj : objects) {
+            auto col = obj->GetComponent<Collider*>();
+            if (col) col->Draw(m_LineShader);
+        }
     }
 }
 
@@ -578,6 +544,30 @@ nlohmann::json::value_type Renderer::Serialize()
     lightsData["Local_Lights"] = localLightsData;
 
     return lightsData;
+}
+
+void Renderer::HammersleyBlockSetup()
+{
+    m_HammersleyData.N = 40; // N=20 ... 40 or whatever
+    m_HammersleyData.values.resize(m_HammersleyData.N * 2);
+    //m_HammersleyData.values = new float[m_HammersleyData.N * 2];
+
+    int kk;
+    int pos = 0;
+    for (int k = 0; k < m_HammersleyData.N; k++) {
+        kk = k;
+        float u = 0.0f;
+        for (float p = 0.5f; kk; p *= 0.5f, kk >>= 1)
+        {
+            if (kk & 1)
+                u += p;
+        }
+        float v = (k + 0.5) / m_HammersleyData.N;
+        m_HammersleyData.values[pos++] = u;
+        m_HammersleyData.values[pos++] = v;
+    }
+
+    glGenBuffers(1, &m_HammersleyBlock);
 }
 
 // Pass variables to the line shader
