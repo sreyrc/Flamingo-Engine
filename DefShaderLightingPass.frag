@@ -28,6 +28,8 @@ uniform sampler2D shadowMap;
 uniform sampler2D irradianceMap;
 uniform sampler2D skyDomeMap;
 
+uniform sampler2D aoMap;
+
 // To convert from world space to 
 // shadow-coord tex space
 uniform mat4 shadowMat;
@@ -149,6 +151,7 @@ void main()
 	vec3 albedo = texture(g_Diffuse, uv).rgb;
 	float roughness = texture(g_RoughMetal, uv).r;
 	float metalness = texture(g_RoughMetal, uv).g;
+	float ao = texture(aoMap, uv).r;
 
     //vec3 N = normalize(Normal);
     vec3 V = normalize(viewPos - FragPos);
@@ -170,6 +173,8 @@ void main()
     vec3 specular = vec3(0.0);
     float NdotL = max(dot(N, L), 0.0);                
     //vec3 kD = vec3(0.0);
+
+    float amtLit = 1.0f;
 
     if (iblOn) {
         
@@ -229,7 +234,7 @@ void main()
             //specular = expControl * specular / (expControl * specular + vec3(1.0));
             //specular = pow(specular, vec3(1.0/2.2));
 
-            Lo += (diffuse + specular);
+            Lo += (diffuse + specular) * ao;
         }
     }
     else {
@@ -248,7 +253,93 @@ void main()
         float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.0001;
         specular     = numerator / denominator;  
 
-        Lo += (kD * albedo / PI + specular) * radiance * NdotL; 
+        Lo += (kD * albedo / PI + specular) * radiance * NdotL * ao; 
+
+            vec4 shadowCoord = shadowMat * vec4(FragPos, 1.0f);
+        vec2 shadowIndex = shadowCoord.xy / shadowCoord.w;
+
+    //    VSM
+    //    float amtLit = 1.0f;
+    //
+    //    float relativePixelDepth;
+    //
+    //    if (shadowCoord.w > 0 &&
+    //    shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
+    //    shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
+    //
+    //         relativePixelDepth = (shadowCoord.w - minDepth) / (maxDepth - minDepth);
+    //         vec4 moments = texture(shadowMap, shadowIndex);
+    //         float relativeLightDepth = moments[0];
+    //
+    //        if (relativePixelDepth > relativeLightDepth) {
+    //            //shadow = 1.0f;
+    //            float mean = moments[0];
+    //            float variance = moments[1] - (mean * mean);
+    //
+    //            float diff = relativePixelDepth - mean;
+    //            amtLit = variance / (variance + (diff * diff));
+    //        }
+    //    }
+    //
+    //    amtLit = clamp(amtLit, 0, 1);
+    //    amtLit = amtLit * amtLit * amtLit;
+    
+        //4-msm
+
+        float shadow = 0.0f;
+
+        if (shadowCoord.w > 0 &&
+        shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
+        shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
+
+            float relativePixelDepth = (shadowCoord.w - minDepth) / (maxDepth - minDepth);
+
+            float alpha = 0.001f; 
+            vec4 b = texture(shadowMap, shadowIndex);
+
+            vec4 bHat = ((1 - alpha) * b) + (alpha * vec4(0.5));
+
+            float m11 = 1.0f;
+            float m12 = bHat[0]; 
+            float m13 = bHat[1];
+            float m22 = bHat[1];
+            float m23 = bHat[2];
+            float m33 = bHat[3];
+
+            float z1 = 1.0f;
+            float z2 = relativePixelDepth;
+            float z3 = relativePixelDepth * relativePixelDepth;
+    
+            vec3 c = Cholesky(m11, m12, m13, m22, m23, m33, z1, z2, z3);
+        
+            // Sqrt discr. = b^2 - 4ac
+            float sqrtDiscr = sqrt((c[1] * c[1]) - (4.0f * c[2] * c[0]));
+
+            z2 = 0.0f;
+            z3 = 0.0f;
+
+            z2 = (-c[1] - sqrtDiscr) / (2.0f * c[2]);
+
+            // z2 should always be the smaller root
+            if (c[2] < 0.0f) {
+                z3 = z2;
+                z2 = (-c[1] + sqrtDiscr) / (2.0f * c[2]);
+            }
+            else { z3 = (-c[1] + sqrtDiscr) / (2.0f * c[2]); }
+
+            if (relativePixelDepth <= z2) { G = 0.0f; }
+        
+            else if (relativePixelDepth <= z3) {
+                shadow = ((relativePixelDepth * z3) - (bHat[0] * (relativePixelDepth + z3)) + (bHat[1]))
+                    / ((z3 - z2) * (relativePixelDepth - z2));
+            }
+            else { 
+                shadow = 1 - (((z2 * z3) - (bHat[0] * (z2 + z3)) + (bHat[1]))
+                     / ((relativePixelDepth - z2) * (relativePixelDepth - z3)));
+            }
+        }
+
+        amtLit = (1 - shadow) * (1 - shadow) * (1 - shadow);
     }
 
 
@@ -257,91 +348,7 @@ void main()
 
     vec3 ambient = vec3(0.03) * albedo;
 
-    vec4 shadowCoord = shadowMat * vec4(FragPos, 1.0f);
-    vec2 shadowIndex = shadowCoord.xy / shadowCoord.w;
 
-//    VSM
-//    float amtLit = 1.0f;
-//
-//    float relativePixelDepth;
-//
-//    if (shadowCoord.w > 0 &&
-//    shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
-//    shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
-//
-//         relativePixelDepth = (shadowCoord.w - minDepth) / (maxDepth - minDepth);
-//         vec4 moments = texture(shadowMap, shadowIndex);
-//         float relativeLightDepth = moments[0];
-//
-//        if (relativePixelDepth > relativeLightDepth) {
-//            //shadow = 1.0f;
-//            float mean = moments[0];
-//            float variance = moments[1] - (mean * mean);
-//
-//            float diff = relativePixelDepth - mean;
-//            amtLit = variance / (variance + (diff * diff));
-//        }
-//    }
-//
-//    amtLit = clamp(amtLit, 0, 1);
-//    amtLit = amtLit * amtLit * amtLit;
-    
-    //4-msm
-
-    float G = 0.0f;
-
-    if (shadowCoord.w > 0 &&
-    shadowIndex.x >= 0.0f && shadowIndex.x <= 1.0f &&
-    shadowIndex.y >= 0.0f && shadowIndex.y <= 1.0f) {
-
-        float relativePixelDepth = (shadowCoord.w - minDepth) / (maxDepth - minDepth);
-
-        float alpha = 0.001f; 
-        vec4 b = texture(shadowMap, shadowIndex);
-
-        vec4 bHat = ((1 - alpha) * b) + (alpha * vec4(0.5));
-
-        float m11 = 1.0f;
-        float m12 = bHat[0]; 
-        float m13 = bHat[1];
-        float m22 = bHat[1];
-        float m23 = bHat[2];
-        float m33 = bHat[3];
-
-        float z1 = 1.0f;
-        float z2 = relativePixelDepth;
-        float z3 = relativePixelDepth * relativePixelDepth;
-    
-        vec3 c = Cholesky(m11, m12, m13, m22, m23, m33, z1, z2, z3);
-        
-        // Sqrt discr. = b^2 - 4ac
-        float sqrtDiscr = sqrt((c[1] * c[1]) - (4.0f * c[2] * c[0]));
-
-        z2 = 0.0f;
-        z3 = 0.0f;
-
-        z2 = (-c[1] - sqrtDiscr) / (2.0f * c[2]);
-
-        // z2 should always be the smaller root
-        if (c[2] < 0.0f) {
-            z3 = z2;
-            z2 = (-c[1] + sqrtDiscr) / (2.0f * c[2]);
-        }
-        else { z3 = (-c[1] + sqrtDiscr) / (2.0f * c[2]); }
-
-        if (relativePixelDepth <= z2) { G = 0.0f; }
-        
-        else if (relativePixelDepth <= z3) {
-            G = ((relativePixelDepth * z3) - (bHat[0] * (relativePixelDepth + z3)) + (bHat[1]))
-                / ((z3 - z2) * (relativePixelDepth - z2));
-        }
-        else { 
-            G = 1 - (((z2 * z3) - (bHat[0] * (z2 + z3)) + (bHat[1]))
-                 / ((relativePixelDepth - z2) * (relativePixelDepth - z3)));
-        }
-    }
-
-    float amtLit = (1 - G) * (1 - G) * (1 - G);
     vec3 color = ambient;
     //vec3 color = ambient + (Lo * amtLit);		
     if (iblOn) { 

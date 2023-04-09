@@ -34,12 +34,11 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_VerticalBlur = new ComputeShader("VerticalBlur.comp");
 
     m_HorizontalAOBlur = new ComputeShader("HorizontalBlurAO.comp");
+    m_VerticalAOBlur = new ComputeShader("VerticalBlurAO.comp");
 
     // TODO: Abstract this away
     glUniform1i(glGetUniformLocation(m_HorizontalAOBlur->GetID(), "g_Position"), 0);
     glUniform1i(glGetUniformLocation(m_HorizontalAOBlur->GetID(), "g_Normal"), 1);
-
-    m_HorizontalAOBlur = new ComputeShader("HorizontalAOBlur.comp");
 
     m_DefShaderGBuffer->Use();
     m_DefShaderGBuffer->SetInt("skyBoxTexture", 0);
@@ -61,6 +60,7 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_DefShaderLighting->SetInt("shadowMap", 4);
     m_DefShaderLighting->SetInt("irradianceMap", 5);
     m_DefShaderLighting->SetInt("skyDomeMap", 6);
+    m_DefShaderLighting->SetInt("aoMap", 7);
     m_DefShaderLighting->SetFloat("width", (float)SCREEN_WIDTH);
     m_DefShaderLighting->SetFloat("height", (float)SCREEN_HEIGHT);
     m_DefShaderLighting->Unuse();
@@ -402,10 +402,11 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
     glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
     glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
 
+    // have a different one for AO Blur
     loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "w");
     glUniform1i(loc, m_KernelHalfWidth);
 
-    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "eyePos");
+    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "viewPos");
     glUniform3f(loc, m_ViewPos.x, m_ViewPos.y, m_ViewPos.z);
 
     glActiveTexture(GL_TEXTURE0);
@@ -414,10 +415,51 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[1]);
 
-    glDispatchCompute(1024/128, 1024, 1);
+    glDispatchCompute(SCREEN_WIDTH/128, SCREEN_HEIGHT, 1);
 
     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-    m_VerticalBlur->Unuse();
+    m_HorizontalAOBlur->Unuse();
+
+
+
+    // Vertical Blur
+    m_VerticalAOBlur->Use();
+
+    imageUnit = 0; // 0 for input image
+    loc = glGetUniformLocation(m_VerticalAOBlur->GetID(), "src"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOAmbientOcclusion.m_GBuffers[0], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    // Output image
+    imageUnit = 1; // 1 for output image
+    loc = glGetUniformLocation(m_VerticalAOBlur->GetID(), "dst"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOAmbientOcclusion.m_GBuffers[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    bindpoint = 0; // Start at zero, increment for other blocks
+    loc = glGetUniformBlockIndex(m_VerticalAOBlur->GetID(), "blurKernel");
+    glUniformBlockBinding(m_VerticalAOBlur->GetID(), loc, bindpoint);
+    glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
+    glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
+    glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
+
+    // have a different one for AO Blur
+    loc = glGetUniformLocation(m_VerticalAOBlur->GetID(), "w");
+    glUniform1i(loc, m_KernelHalfWidth);
+
+    loc = glGetUniformLocation(m_VerticalAOBlur->GetID(), "viewPos");
+    glUniform3f(loc, m_ViewPos.x, m_ViewPos.y, m_ViewPos.z);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[0]);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[1]);
+
+    glDispatchCompute(SCREEN_WIDTH, SCREEN_HEIGHT / 128, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_VerticalAOBlur->Unuse();
 
 
     // PASS 2 - LIGHTING PASS
@@ -451,6 +493,9 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
 
     glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, m_FBOLightDepthBlurred.m_GBuffers[0]);
+
+    glActiveTexture(GL_TEXTURE7);
+    glBindTexture(GL_TEXTURE_2D, m_FBOAmbientOcclusion.m_GBuffers[0]);
 
     if (m_IBLon) {
         glActiveTexture(GL_TEXTURE5);
