@@ -289,5 +289,17 @@
     <None Include="SkyDome.vert">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="AmbientBufferPass.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="AmbientBufferPass.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="VerticalBlurAO.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="HorizontalBlurAO.comp">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

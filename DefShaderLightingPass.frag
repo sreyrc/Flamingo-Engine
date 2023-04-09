@@ -51,15 +51,14 @@ float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
     float a = roughness * roughness;
     float a2 = a * a;
-    //float NdotH = max(dot(N, H), 0.0);
-    float NdotH = dot(N, H);
+    float NdotH = max(dot(N, H), 0.0);
     float NdotH2 = NdotH * NdotH;
 
-    float nom   = a2;
+    float num   = a2;
     float denom = (NdotH2 * (a2 - 1.0) + 1.0);
     denom = PI * denom * denom;
 
-    return nom / denom;
+    return num / denom;
 }
 
 float GeometrySchlickGGX(float NdotV, float roughness)
@@ -185,7 +184,8 @@ void main()
 		    kD *= 1.0 - metalness;
 
             vec3 irradiance = texture(irradianceMap, toUV(N)).xyz;
-            vec3 diffuse = (albedo / PI) * irradiance;
+            //irradiance = pow(irradiance, vec3(2.2));
+            vec3 diffuse = (kD * albedo / PI) * irradiance * 2.0f;
 
             vec3 R = 2 * dot(N, V) * N - V;
 
@@ -201,7 +201,7 @@ void main()
                 float val2 = hb.hammersley[i + 1];
 
                 //θ = tan−1( αg √ξ2/√1−ξ2 )
-                float theta = atan(roughness * sqrt(val2) / sqrt(1 - val2));
+                float theta = atan(roughness * sqrt(val1) / sqrt(1 - val1));
                 //float theta = acos(pow(val2, 1.0/(roughness + 1.0)));
                 vec2 currUV = vec2(val1, theta/PI);
 
@@ -221,15 +221,13 @@ void main()
                 vec3 Li = textureLod(skyDomeMap, toUV(wK), level).xyz;
 
                 specular += cos(theta) * Li * GeometrySmith(N, V, wK, roughness) 
-                * FresnelSchlick(dot(wK,H), kS) / (4.0 * dot(N, V) * dot(N, wK));
-
-
+                * FresnelSchlick(max(dot(wK,H), 0.0), kS) / (4.0 * max(dot(N, V), 0.0) * max(dot(N, wK), 0.0) + 0.0001);
             }
             specular /= hb.n;
 
             // Tone-mapping
             //specular = expControl * specular / (expControl * specular + vec3(1.0));
-            specular = pow(specular, vec3(1.0/2.2));
+            //specular = pow(specular, vec3(1.0/2.2));
 
             Lo += (diffuse + specular);
         }
@@ -350,10 +348,10 @@ void main()
         color += Lo;
     }
     else { 
-        color += (Lo * amtLit); 
-        color = color / (color + vec3(1.0));
-        color = pow(color, vec3(1.0/2.2));  
+        color += (Lo * amtLit);  
     }		
+    //color = expControl * color / (expControl * color + vec3(1.0));
+    color = pow(color, vec3(1.0/2.2)); 
 
     FragColor = vec4(color, 1.0);
 }

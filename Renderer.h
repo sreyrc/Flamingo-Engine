@@ -69,16 +69,18 @@ public:
     std::vector<Light> m_LocalLights;
 
     // Shaders: 
-    Shader* m_ModelShader, * m_ModelShaderPBR,
+    Shader* m_ModelShader, *  m_ModelShaderPBR,
         *m_DefShaderGBuffer, * m_DefShaderLighting,
         *m_DefShaderGBufTex,
         *m_MultLocalLightsShader,
         *m_LineShader,
         *m_ShadowShader,
-        *m_SkyDomeShader;
+        *m_SkyDomeShader,
+        *m_AmbientOcclusionShader;
 
-    ComputeShader* m_HorizontalBlur, 
-        *m_VerticalBlur;
+
+    ComputeShader* m_HorizontalBlur, *m_VerticalBlur, 
+        *m_HorizontalAOBlur, *m_VerticalAOBlur;
 
     // A ref to the scene camera
     Camera* m_Camera;
@@ -99,17 +101,23 @@ public:
     // the global light's perspective - req for shadows
     FBO m_FBOLightDepth;
 
+    // Store ambient occlusion at each frag
+    FBO m_FBOAmbientOcclusion;
+
     // Blurred shadow-map
     FBO m_FBOLightDepthBlurred;
 
     // Full-screen quad on which final image is output
-    QuadMesh m_QuadDefShadingOutput;
+    QuadMesh m_Quad;
 
     int m_KernelHalfWidth = 5;
 
     float m_CenterRadius = 10.0f;
 
     float m_ExposureControl = 1.0f;
+
+    // TODO: Make these modifiable via the editor
+    float m_s = 1.0f, m_k = 1.0f, m_R = 0.5f;
 
     bool m_IBLon = false;
 

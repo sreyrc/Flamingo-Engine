@@ -102,6 +102,21 @@ void Editor::Update(
         ImGui::Separator();
         ImGui::Dummy(ImVec2(20, 20));
 
+
+        // Ambient Occlusion settings
+        ImGui::Text("Ambient Occlusion:");
+
+        ImGui::Image((ImTextureID)p_Renderer->m_FBOAmbientOcclusion.m_GBuffers[0],
+            ImVec2(384, 216), ImVec2(0, 1), ImVec2(1, 0));
+
+        ImGui::DragFloat("s", &p_Renderer->m_s);
+        ImGui::DragFloat("k", &p_Renderer->m_k);
+        ImGui::DragFloat("R", &p_Renderer->m_R);
+
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(20, 20));
+
         // Lights
         ImGui::Text("Lighting:");
         ImGui::Dummy(ImVec2(20, 20));
@@ -248,7 +263,7 @@ void Editor::Update(
                     if (mt) {
                         ImGui::ColorEdit3("Albedo", &mt->m_Albedo.x);
                         ImGui::SliderFloat("Metalness", &mt->m_Metalness, 0.0f, 1.0f);
-                        ImGui::SliderFloat("Roughness", &mt->m_Roughness, 0.0f, 1.0f);
+                        ImGui::DragFloat("Shininess", &mt->m_Shininess);
                     }
                     ImGui::EndTabItem();
                 }
@@ -285,7 +300,7 @@ void Editor::Update(
                         eObjProp() / static_cast<float>(eObjProp.max()),
                         eObjProp() / static_cast<float>(eObjProp.max()));
                     mat->m_Metalness = eObjProp() / static_cast<float>(eObjProp.max());
-                    mat->m_Roughness = eObjProp() / static_cast<float>(eObjProp.max());
+                    mat->m_Shininess = eObjProp() / static_cast<float>(eObjProp.max());
 
                     md->SetDefaults(p_ResourceManager);
                     //mat->SetDefaults(p_ResourceManager);

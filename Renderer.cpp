@@ -18,6 +18,7 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_LineWidth = 1.0f;
 
     // Creating shaders
+    // TODO: Use smart ptrs
     m_ModelShader = new Shader("ModelShader.vert", "ModelShader.frag");
     m_ModelShaderPBR = new Shader("ModelShaderPBR.vert", "ModelShaderPBR.frag");
     m_DefShaderGBuffer = new Shader("DefShaderGBufPass.vert", "DefShaderGBufPass.frag");
@@ -27,9 +28,18 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_MultLocalLightsShader = new Shader("MultLocalLightsShader.vert", "MultLocalLightsShader.frag");
     m_ShadowShader = new Shader("Shadow.vert", "Shadow.frag");
     m_SkyDomeShader = new Shader("SkyDome.vert", "SkyDome.frag");
+    m_AmbientOcclusionShader = new Shader("AmbientBufferPass.vert", "AmbientBufferPass.frag");
     
     m_HorizontalBlur = new ComputeShader("HorizontalBlur.comp");
     m_VerticalBlur = new ComputeShader("VerticalBlur.comp");
+
+    m_HorizontalAOBlur = new ComputeShader("HorizontalBlurAO.comp");
+
+    // TODO: Abstract this away
+    glUniform1i(glGetUniformLocation(m_HorizontalAOBlur->GetID(), "g_Position"), 0);
+    glUniform1i(glGetUniformLocation(m_HorizontalAOBlur->GetID(), "g_Normal"), 1);
+
+    m_HorizontalAOBlur = new ComputeShader("HorizontalAOBlur.comp");
 
     m_DefShaderGBuffer->Use();
     m_DefShaderGBuffer->SetInt("skyBoxTexture", 0);
@@ -64,6 +74,12 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
     m_MultLocalLightsShader->SetFloat("width", (float)SCREEN_WIDTH);
     m_MultLocalLightsShader->SetFloat("height", (float)SCREEN_HEIGHT);
     m_MultLocalLightsShader->Unuse();
+
+    m_AmbientOcclusionShader->Use();
+    m_AmbientOcclusionShader->SetInt("g_Position", 0);
+    m_AmbientOcclusionShader->SetInt("g_Normal", 1);
+    m_AmbientOcclusionShader->SetInt("width", SCREEN_WIDTH);
+    m_AmbientOcclusionShader->SetInt("height", SCREEN_HEIGHT);
 
     m_ShadowProj = glm::perspective(
         glm::radians(60.0f), 1.0f, 0.1f, 1000.0f);
@@ -101,6 +117,9 @@ Renderer::Renderer(Camera* cam, int SCREEN_WIDTH, int SCREEN_HEIGHT)
 
     // For storing depth values. Needed for shadow-mapping
     m_FBOLightDepthBlurred.CreateFBO(1024, 1024, 1);
+
+    // For storing ambient occlusion values
+    m_FBOAmbientOcclusion.CreateFBO(SCREEN_WIDTH, SCREEN_HEIGHT, 1);
 
     glGenBuffers(1, &m_Block); // Generates block
     glGenBuffers(1, &m_Block1); // Generates block
@@ -240,7 +259,7 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
     glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
     glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
     glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
-
+        
     loc = glGetUniformLocation(m_VerticalBlur->GetID(), "w");
     glUniform1i(loc, m_KernelHalfWidth);
 
@@ -295,7 +314,8 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
             if (material) {
                 m_DefShaderGBuffer->SetVec3("material.kD", material->m_Albedo);
                 m_DefShaderGBuffer->SetFloat("material.metalness", material->m_Metalness);
-                m_DefShaderGBuffer->SetFloat("material.alpha", material->m_Roughness);
+                float roughness = sqrt(2.0/(material->m_Shininess + 2.0));
+                m_DefShaderGBuffer->SetFloat("material.alpha", roughness);
             }
             // Draw the model with this shader
             obj->GetComponent<ModelComp*>()->Draw(*m_DefShaderGBuffer);
@@ -313,7 +333,6 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
 
         glm::mat4 skyModelTr = glm::mat4(1.0f);
         skyModelTr = glm::scale(skyModelTr, glm::vec3(100, 100, 100));
-        //skyModelTr = glm::rotate(skyModelTr, glm::radians(90.0f), glm::vec3(1, 0, 0));
         m_DefShaderGBuffer->SetMat4("model", skyModelTr);
         glm::mat4 skyView = glm::mat4(glm::mat3(m_ViewMat));
         m_DefShaderGBuffer->SetMat4("view", skyView);
@@ -330,10 +349,82 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
         m_DefShaderGBuffer->Unuse();
     }
 
+
+    // --- IN BETWEEN: AMBIENT OCCLUSION PASS ---
+
+    // --- AO BUFFER PASS ---
+
+    m_FBOAmbientOcclusion.Bind();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    m_AmbientOcclusionShader->Use();
+    
+    // Set Shader vars
+    m_AmbientOcclusionShader->SetVec3("eyePos", m_ViewPos);
+    m_AmbientOcclusionShader->SetFloat("s", m_s);
+    m_AmbientOcclusionShader->SetFloat("k", m_k);
+    m_AmbientOcclusionShader->SetFloat("R", m_R);
+
+    // World Pos buffer
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[0]);
+
+    // Normal Buffer
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[1]);
+
+    m_Quad.BindVAO();
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+
+    m_FBOAmbientOcclusion.Unbind();
+    m_AmbientOcclusionShader->Unuse();
+
+    // --- AO MAP BLUR PASS --
+
+    m_HorizontalAOBlur->Use();
+
+    imageUnit = 0; // 0 for input image
+    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "src"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOAmbientOcclusion.m_GBuffers[0], 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    // Output image
+    imageUnit = 1; // 1 for output image
+    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "dst"); // Perhaps “src” and “dst”.
+    glBindImageTexture(imageUnit, m_FBOAmbientOcclusion.m_GBuffers[0], 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    glUniform1i(loc, imageUnit);
+
+    bindpoint = 0; // Start at zero, increment for other blocks
+    loc = glGetUniformBlockIndex(m_HorizontalAOBlur->GetID(), "blurKernel");
+    glUniformBlockBinding(m_HorizontalAOBlur->GetID(), loc, bindpoint);
+    glBindBuffer(GL_UNIFORM_BUFFER, m_Block);
+    glBindBufferBase(GL_UNIFORM_BUFFER, bindpoint, m_Block);
+    glBufferData(GL_UNIFORM_BUFFER, weights.size() * sizeof(float), &weights[0], GL_STATIC_DRAW);
+
+    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "w");
+    glUniform1i(loc, m_KernelHalfWidth);
+
+    loc = glGetUniformLocation(m_HorizontalAOBlur->GetID(), "eyePos");
+    glUniform3f(loc, m_ViewPos.x, m_ViewPos.y, m_ViewPos.z);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[0]);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, m_FBOForDefShading.m_GBuffers[1]);
+
+    glDispatchCompute(1024/128, 1024, 1);
+
+    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    m_VerticalBlur->Unuse();
+
+
     // PASS 2 - LIGHTING PASS
 
     // Now output is to the screen
-    m_FBOForDefShading.Unbind();
+    //m_FBOForDefShading.Unbind();
+
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -382,11 +473,11 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
         m_DefShaderLighting->SetFloat("expControl", m_ExposureControl);
     }
 
-    m_QuadDefShadingOutput.BindVAO();
+    m_Quad.BindVAO();
     glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
-    // --- MULTIPLE LOCAL LIGHTS PASS --- 
+    //// --- MULTIPLE LOCAL LIGHTS PASS --- 
 
     // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -425,7 +516,7 @@ void Renderer::Draw(std::vector<Object*>& objects, ResourceManager* p_ResourceMa
     //glDisable(GL_BLEND);
     //glDisable(GL_CULL_FACE);
 
-    // ------- FORWARD SHADING -------
+    //// ------- FORWARD SHADING -------
     //// Draw the models
     //m_ModelShaderPBR->Use();
     //m_ModelShaderPBR->SetMat4("proj", m_ProjMat);

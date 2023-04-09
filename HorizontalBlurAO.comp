@@ -1,0 +1,72 @@
+#version 430 // Version of OpenGL with COMPUTE shader support
+
+// Declares thread group size
+layout (local_size_x = 128, local_size_y = 1, local_size_z = 1) in; 
+
+// Declares a uniform block
+uniform blurKernel { float weights[101]; }; 
+
+// half-size of kernel
+uniform int w;
+
+// src image as 4 channel 32bit float readonly
+layout (rgba32f) uniform readonly image2D src; 
+
+// dst image as 4 channel 32bit float writeonly
+layout (rgba32f) uniform writeonly image2D dst; 
+
+// Variable shared with other threads in the 128x1 thread group
+shared vec4 v[128+101];
+
+shared float dist[128+101];
+shared vec3 n[128+101];
+
+uniform sampler2D g_Position;
+uniform sampler2D g_Normal;
+
+uniform vec3 eyePos;
+
+const float PI = 3.141592;
+const float s = 0.01;
+
+
+void main() {
+	// Combo of groupID, groupSize and localID
+	ivec2 gpos = ivec2(gl_GlobalInvocationID.xy); 
+
+	// Local thread id in the 128x1 thread groups128x1
+	uint i = gl_LocalInvocationID.x; 
+
+	// read an image pixel at an ivec2(.,.) position
+	v[i] = imageLoad(src, gpos + ivec2(-w, 0)); 
+
+	dist[i] = length(eyePos - texelFetch(g_Position, gpos- ivec2(w,0), 0).xyz);
+	n[i] = texelFetch(g_Normal, gpos - ivec2(w,0), 0).xyz;
+
+	 // read extra 2 * w pixels
+	if (i < (2 * w)) { 
+		v[i + 128] = imageLoad(src, gpos + ivec2(128 - w, 0));
+		dist[i + 150] = length(eyePos - texelFetch(g_Position, gpos + ivec2(128 - w,0), 0).xyz);
+		n[i + 150] = texelFetch(g_Normal, gpos+ivec2(128 - w,0), 0).xyz;
+	}
+	barrier(); // Wait for all threads to catch up before reading v[]
+
+	vec4 sum = vec4(0);
+	float sumWeights = 0;
+	vec3 N = n[i+w];
+	float d = dist[i+w];
+	for(int j = 0; j < (2 * w + 1); j++) {
+
+		vec3 Ni = n[i+j];
+		float di = dist[i+j];
+
+		float currWeight = weights[j] * max(0.0, dot(Ni,N)) * 
+		exp(-(di - d) * (di - d) / (2 * s)) / sqrt(2 * PI * s);
+		sumWeights += currWeight;
+		sum += currWeight * weights[j] * v[i + j];
+	}
+
+	if(sumWeights != 0.0) { sum /= sumWeights; }
+
+	imageStore(dst, gpos, sum); // Write to destination image
+}

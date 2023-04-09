@@ -257,7 +257,7 @@ private:
 
 class Material : public Component {
 public:
-	Material() : m_Albedo(1.0f), m_Metalness(0.5f), m_Roughness(0.5f), m_AO(0.0f) {}
+	Material() : m_Albedo(1.0f), m_Metalness(0.5f), m_Shininess(0.5f), m_AO(0.0f) {}
 	~Material() {}
 	void Update() {}
 	std::string GetName() { return "Material"; }
@@ -272,7 +272,7 @@ public:
 			jsonObj["Albedo"][1], jsonObj["Albedo"][2]);
 
 		m_Metalness = jsonObj["Metalness"];
-		m_Roughness = jsonObj["Roughness"];
+		m_Shininess = jsonObj["Roughness"];
 		m_AO = jsonObj["AO"];
 	};
 
@@ -283,12 +283,12 @@ public:
 		jsonObject["Albedo"] = nlohmann::json::array(
 			{m_Albedo.x, m_Albedo.y, m_Albedo.z});
 		jsonObject["Metalness"] = m_Metalness;
-		jsonObject["Roughness"] = m_Roughness;
+		jsonObject["Roughness"] = m_Shininess;
 		jsonObject["AO"] = m_AO;
 		return jsonObject;
 	}
 
 	glm::vec3 m_Albedo;
-	float m_Metalness, m_Roughness, m_AO;
+	float m_Metalness, m_Shininess, m_AO;
 };
 

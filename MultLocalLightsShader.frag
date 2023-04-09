@@ -88,7 +88,7 @@ void main()
 	    float metalness = texture(g_RoughMetal, uv).g;
 
         vec3 V = normalize(viewPos - FragPos);
-   
+
         vec3 F0 = vec3(0.04); 
         F0 = mix(F0, albedo, metalness);
 
