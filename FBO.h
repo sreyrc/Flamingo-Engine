@@ -33,6 +33,8 @@ public:
 		// G-Buffer 1: World Normals
 		// G-Buffer 2: Albedo (Diffuse color)
 		// G-Buffer 3: Roughness and Metalness
+
+		// These can be used to store other kind of data also
 		for (int i = 0; i < numColorAttachments; i++) {
 			glGenTextures(1, &m_GBuffers[i]);
 			glBindTexture(GL_TEXTURE_2D, m_GBuffers[i]);

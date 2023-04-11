@@ -59,6 +59,13 @@ void Editor::Update(
 
     // Object editor
     ImGui::Begin("Scene Editor"); {
+
+        ImGui::Checkbox("Show Colliders", &p_Renderer->m_DebugCollidersOn);
+
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
+        ImGui::Dummy(ImVec2(20, 20));
+
         ImGui::Text("Scenes: ");
 
         if (ImGui::BeginListBox("##SceneList")) {
@@ -95,15 +102,38 @@ void Editor::Update(
         ImGui::Separator();
         ImGui::Dummy(ImVec2(20, 20));
 
-        // Lights
-        ImGui::Text("Lights:");
+
+        // Ambient Occlusion settings
+        ImGui::Text("Ambient Occlusion:");
+
+        ImGui::Image((ImTextureID)p_Renderer->m_FBOAmbientOcclusion.m_GBuffers[0],
+            ImVec2(384, 216), ImVec2(0, 1), ImVec2(1, 0));
+
+        ImGui::DragFloat("s", &p_Renderer->m_s);
+        ImGui::DragFloat("k", &p_Renderer->m_k);
+        ImGui::DragFloat("R", &p_Renderer->m_R);
+
+        ImGui::Dummy(ImVec2(20, 20));
+        ImGui::Separator();
         ImGui::Dummy(ImVec2(20, 20));
 
-        // Global light
-        ImGui::DragFloat3("Global Light Position",
-            &p_Renderer->m_GlobalLight.m_Position.x);
-        ImGui::DragFloat3("Global Light Color",
-            &p_Renderer->m_GlobalLight.m_Color.x);
+        // Lights
+        ImGui::Text("Lighting:");
+        ImGui::Dummy(ImVec2(20, 20));
+
+        ImGui::Checkbox("IBL", &p_Renderer->m_IBLon);
+
+        if (!p_Renderer->m_IBLon) {
+
+            // Global light
+            ImGui::SliderFloat3("Global Light Position",
+                &p_Renderer->m_GlobalLight.m_Position.x, -100.0f, 100.0f);
+            ImGui::SliderFloat3("Global Light Color",
+                &p_Renderer->m_GlobalLight.m_Color.x, 0, 300.0f);
+        }
+        else {
+            ImGui::SliderFloat("Tone-Map", &p_Renderer->m_ExposureControl, 0.1f, 1000.0f);
+        }
 
         ImGui::Dummy(ImVec2(20, 20));
 
@@ -121,11 +151,11 @@ void Editor::Update(
                     std::string posLabel = "Position ##" + lightNumText;
                     std::string colorLabel = "Color ##" + lightNumText;
                     std::string rangeLabel = "Range ##" + lightNumText;
-                    ImGui::DragFloat3(posLabel.c_str(),
-                        &p_Renderer->m_LocalLights[i].m_Position.x);
-                    ImGui::DragFloat3(colorLabel.c_str(),
-                        &p_Renderer->m_LocalLights[i].m_Color.x);
-                    ImGui::DragFloat(rangeLabel.c_str(),
+                    ImGui::SliderFloat3(posLabel.c_str(),
+                        &p_Renderer->m_LocalLights[i].m_Position.x, -20.0f, 20.0f);
+                    ImGui::SliderFloat3(colorLabel.c_str(),
+                        &p_Renderer->m_LocalLights[i].m_Color.x, 0.0f, 100.0f);
+                    ImGui::SliderFloat3(rangeLabel.c_str(),
                         &p_Renderer->m_LocalLights[i].m_Range, 1.0f, 200.0f);
 
                     ImGui::EndTabItem();
@@ -189,8 +219,8 @@ void Editor::Update(
                     ImGui::Text("Transform: ");
                     Transform* tr = objects[i]->GetComponent<Transform*>();
                     if (tr) {
-                        ImGui::DragFloat3("Position", &tr->m_Position.x, -10.0f, 10.0f);
-                        ImGui::DragFloat3("Scale", &tr->m_Scale.x, 0.1f, 2.0f);
+                        ImGui::SliderFloat3("Position", &tr->m_Position.x, -20.0f, 20.0f);
+                        ImGui::SliderFloat3("Scale", &tr->m_Scale.x, 0.1f, 2.0f);
                         ImGui::SliderFloat3("Rotation", &tr->m_RotationEuler.x, -180.0f, 180.0f);
                     }
 
@@ -233,7 +263,7 @@ void Editor::Update(
                     if (mt) {
                         ImGui::ColorEdit3("Albedo", &mt->m_Albedo.x);
                         ImGui::SliderFloat("Metalness", &mt->m_Metalness, 0.0f, 1.0f);
-                        ImGui::SliderFloat("Roughness", &mt->m_Roughness, 0.0f, 1.0f);
+                        ImGui::DragFloat("Shininess", &mt->m_Shininess);
                     }
                     ImGui::EndTabItem();
                 }
@@ -270,7 +300,7 @@ void Editor::Update(
                         eObjProp() / static_cast<float>(eObjProp.max()),
                         eObjProp() / static_cast<float>(eObjProp.max()));
                     mat->m_Metalness = eObjProp() / static_cast<float>(eObjProp.max());
-                    mat->m_Roughness = eObjProp() / static_cast<float>(eObjProp.max());
+                    mat->m_Shininess = eObjProp() / static_cast<float>(eObjProp.max());
 
                     md->SetDefaults(p_ResourceManager);
                     //mat->SetDefaults(p_ResourceManager);

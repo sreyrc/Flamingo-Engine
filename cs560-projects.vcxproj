@@ -180,6 +180,7 @@
     <ClCompile Include="Shader.cpp" />
     <ClCompile Include="SoftBody.cpp" />
     <ClCompile Include="stb_impl.cpp" />
+    <ClCompile Include="TextureHDR.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AABB.h" />
@@ -219,8 +220,11 @@
     <ClInclude Include="SoftBody.h" />
     <ClInclude Include="SphereMesh.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="TextureHDR.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="AmbientBufferPass.frag" />
+    <None Include="AmbientBufferPass.vert" />
     <None Include="DefShaderMultLights.frag" />
     <None Include="DefShaderGBufPass.frag" />
     <None Include="DefShaderGBufPass.vert" />
@@ -228,6 +232,7 @@
     <None Include="DefShaderGBufTex.vert" />
     <None Include="DefShaderLightingPass.frag" />
     <None Include="DefShaderLightingPass.vert" />
+    <None Include="HorizontalBlurAO.comp" />
     <None Include="LineShader.frag" />
     <None Include="LineShader.vert" />
     <None Include="ModelShader.frag" />
@@ -239,11 +244,12 @@
     <None Include="Shadow.frag" />
     <None Include="Shadow.vert" />
     <None Include="HorizontalBlur.comp" />
-    <None Include="Skybox.frag" />
-    <None Include="Skybox.vert" />
+    <None Include="SkyDome.frag" />
+    <None Include="SkyDome.vert" />
     <None Include="SoftBody.frag" />
     <None Include="SoftBody.vert" />
     <None Include="VerticalBlur.comp" />
+    <None Include="VerticalBlurAO.comp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
